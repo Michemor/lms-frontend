@@ -55,7 +55,7 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
         // Set initial max days and ID for first policy
         if (policiesArray.length > 0) {
           const initialPolicy = policiesArray[0];
-          setSelectedTypeMaxDays(initialPolicy.days_allowed);
+          setSelectedTypeMaxDays(initialPolicy.max_days);
           setFormData(prev => ({
             ...prev,
             leaveTypeId: initialPolicy.id,
@@ -87,7 +87,7 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
           leaveTypeId: selectedType.id,
           leaveTypeName: selectedType.name,
         }));
-        setSelectedTypeMaxDays(selectedType.days_allowed);
+        setSelectedTypeMaxDays(selectedType.max_days);
       }
     } else if (name === 'startDate' || name === 'endDate') {
       setFormData((prev) => ({
