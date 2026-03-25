@@ -18,16 +18,6 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
   const [exceedsLimit, setExceedsLimit] = useState(false);
   const [isLoadingPolicies, setIsLoadingPolicies] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [policyError, setPolicyError] = useState(null);
-
-  // Helper: Get default leave policies if API fails (fallback)
-  const getDefaultLeavePolicies = () => [
-    { id: 1, name: 'Annual Leave', max_days: 21 },
-    { id: 2, name: 'Sick Leave', max_days: 7 },
-    { id: 3, name: 'Family Responsibility Leave', max_days: 3 },
-    { id: 4, name: 'Study Leave', max_days: 5 },
-    { id: 5, name: 'Special Leave', max_days: 2 },
-  ];
 
   const { showSuccess, showError, showWarning } = useAlert();
 
@@ -86,7 +76,6 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
     const fetchPolicies = async () => {
       try {
         setIsLoadingPolicies(true);
-        setPolicyError(null);
         const data = await getLeavePolices();
         
         console.log('Leave Policies API Response:', data);
@@ -101,20 +90,12 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
             policiesArray = data.results;
           } else if (Array.isArray(data.data)) {
             policiesArray = data.data;
-          } else if (data.results && typeof data.results === 'object') {
-            policiesArray = Object.values(data.results);
-          } else {
-            // Last resort: treat the object itself as an array if it has numeric keys
-            const values = Object.values(data).filter(item => item && typeof item === 'object' && (item.id || item.name));
-            policiesArray = values.length > 0 ? values : [];
           }
         }
         
         console.log('Processed Policies Array from API:', policiesArray);
         
-        // If API returns data, use it; otherwise use fallback
         if (policiesArray.length > 0) {
-          setLeavePolicies(policiesArray);
           setLeavePolicies(policiesArray);
           
           // Set initial max days and ID for first policy
@@ -130,22 +111,8 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
         }
       } catch (error) {
         console.error('Error fetching leave policies from API:', error);
-        setPolicyError(`Using default leave types: ${error.message}`);
-        
-        // Always fallback to default leave types
-        const fallbackPolicies = getDefaultLeavePolicies();
-        console.log('Using fallback leave types:', fallbackPolicies);
-        setLeavePolicies(fallbackPolicies);
-        
-        if (fallbackPolicies.length > 0) {
-          const initialPolicy = fallbackPolicies[0];
-          setSelectedPolicyMaxDays(initialPolicy.max_days);
-          setFormData(prev => ({
-            ...prev,
-            leaveTypeId: initialPolicy.id,
-            leaveTypeName: initialPolicy.name,
-          }));
-        }
+        setLeavePolicies([]);
+        showError('Failed to load leave types. Please refresh the page or contact support.');
       } finally {
         setIsLoadingPolicies(false);
       }
@@ -154,7 +121,7 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
     if (isOpen) {
       fetchPolicies();
     }
-  }, [isOpen]);
+  }, [isOpen, showError]);
 
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
@@ -419,14 +386,6 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
                   <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-xs text-red-700 font-semibold">
                       ⚠️ Could not load leave types. Check the browser console for details.
-                    </p>
-                  </div>
-                )}
-                
-                {policyError && (
-                  <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-xs text-yellow-800 font-semibold">
-                      📋 {policyError}
                     </p>
                   </div>
                 )}

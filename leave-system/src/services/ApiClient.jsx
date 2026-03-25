@@ -119,10 +119,18 @@ export const applyLeave = async (leaveData) => {
       has_document: !!leaveData.document,
     });
 
+    // Log FormData contents
+    for (let [key, value] of apiData.entries()) {
+      console.log(`FormData - ${key}:`, value instanceof File ? `File: ${value.name}` : value);
+    }
+
     const response = await apiClient.post('/leaves/apply/', apiData);
     return response.data;
   } catch (error) {
     console.error('Leave application error response:', error.response?.data);
+    console.error('Leave application error status:', error.response?.status);
+    console.error('Leave application error headers:', error.response?.headers);
+    console.error('Request config:', error.config);
     console.error('Full error details:', error);
     throw new Error('Failed to apply for leave', { cause: error.message });
   }
