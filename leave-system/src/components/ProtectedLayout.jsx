@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import SideBar from './SideBar';
 import { useAuth } from '../hooks/authhook';
 import { useAlert } from '../hooks/alerthook';
-import { setAlertHandler } from '../services/ApiClient';
+import { setAlertHandler, getLeaveHistory } from '../services/ApiClient';
 import { GiHamburgerMenu } from 'react-icons/gi';
 
 /**
@@ -20,11 +20,84 @@ export default function ProtectedLayout({ children, title, subtitle, action }) {
   const { logout } = useAuth();
   const { showError } = useAlert();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const notificationRef = useRef(null);
+
+  // Fetch leave notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const data = await getLeaveHistory();
+        const leaveData = Array.isArray(data) ? data : data.results || [];
+        
+        // Filter approved leaves and calculate remaining days
+        const approvedLeaves = leaveData.filter(leave => 
+          leave.status === 'approved' || leave.status === 'Approved'
+        );
+        
+        const activeNotifications = approvedLeaves
+          .map(leave => {
+            const start = new Date(leave.start_date);
+            const end = new Date(leave.end_date);
+            const today = new Date();
+            
+            const totalLeaveDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            let totalUsedDays = 0;
+            
+            if (today >= start) {
+              if (today >= end) {
+                totalUsedDays = totalLeaveDays;
+              } else {
+                totalUsedDays = Math.ceil((today - start) / (1000 * 60 * 60 * 24)) + 1;
+              }
+            }
+            
+            const remainingDays = Math.max(totalLeaveDays - totalUsedDays, 0);
+            
+            return {
+              ...leave,
+              remainingDays,
+              leaveType: leave.leave_type || leave.type
+            };
+          })
+          .filter(leave => leave.remainingDays >= 0 && leave.remainingDays <= 3)
+          .sort((a, b) => a.remainingDays - b.remainingDays);
+        
+        setNotifications(activeNotifications);
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+      }
+    };
+    
+    fetchNotifications();
+  }, []);
 
   // Register alert handler with ApiClient for token expiration alerts
   useEffect(() => {
     setAlertHandler(showError);
   }, [showError]);
+
+  // Close notification dropdown when route changes
+  useEffect(() => {
+    setIsNotificationOpen(false);
+  }, [location.pathname]);
+
+  // Close notification dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setIsNotificationOpen(false);
+      }
+    };
+
+    if (isNotificationOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [isNotificationOpen]);
 
   const handleLogout = () => {
     logout();
@@ -63,7 +136,83 @@ export default function ProtectedLayout({ children, title, subtitle, action }) {
               </div>
             </div>
             {action && (
-              <div className="flex-shrink-0 w-full sm:w-auto">
+              <div className="flex-shrink-0 w-full sm:w-auto flex flex-col sm:flex-row gap-2 sm:gap-3 items-center relative">
+                {/* Notification Bell Button */}
+                <div className="relative" ref={notificationRef}>
+                  <button
+                    onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                    className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition min-h-[44px]"
+                    title="Click to see notifications"
+                  >
+                    <span className="text-lg">🔔</span>
+                    <span className="hidden sm:inline text-sm font-semibold text-blue-700">Notifications</span>
+                  </button>
+
+                  {/* Notifications Dropdown */}
+                  {isNotificationOpen && (
+                    <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-300 rounded-lg shadow-xl z-50">
+                      <div className="p-4 border-b border-slate-200">
+                        <h3 className="font-bold text-slate-900 text-sm">Leave Notifications</h3>
+                      </div>
+                      
+                      <div className="max-h-96 overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="p-4 text-center text-slate-500">
+                            <p className="text-sm">No notifications</p>
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-slate-200">
+                            {notifications.map((leave) => {
+                              const leaveTypeLabel = {
+                                'ANN': 'Annual Leave',
+                                'SICK': 'Sick Leave',
+                                'FAMILY': 'Family Responsibility Leave',
+                                'STUDY': 'Study Leave',
+                                'SPECIAL': 'Special Leave',
+                              }[leave.leaveType] || leave.leaveType;
+
+                              let alertColor = 'bg-blue-50 border-l-4 border-blue-500';
+                              let alertIcon = '📅';
+                              let alertMessage = '';
+
+                              if (leave.remainingDays === 0) {
+                                alertColor = 'bg-red-50 border-l-4 border-red-500';
+                                alertIcon = '🚨';
+                                alertMessage = 'Last day!';
+                              } else if (leave.remainingDays === 1) {
+                                alertColor = 'bg-red-50 border-l-4 border-red-500';
+                                alertIcon = '🚨';
+                                alertMessage = '1 day left!';
+                              } else if (leave.remainingDays === 2) {
+                                alertColor = 'bg-orange-50 border-l-4 border-orange-500';
+                                alertIcon = '⚡';
+                                alertMessage = '2 days left!';
+                              } else if (leave.remainingDays === 3) {
+                                alertColor = 'bg-blue-50 border-l-4 border-blue-500';
+                                alertIcon = '📅';
+                                alertMessage = '3 days left!';
+                              }
+
+                              return (
+                                <div key={leave.id} className={`p-3 ${alertColor}`}>
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-lg flex-shrink-0">{alertIcon}</span>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-semibold text-slate-900 text-sm truncate">{leaveTypeLabel}</p>
+                                      <p className="text-xs text-slate-600 mt-1">{alertMessage}</p>
+                                      <p className="text-xs text-slate-500 mt-1">{leave.start_date} to {leave.end_date}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {typeof action === 'object' && action?.label ? (
                   <button
                     onClick={action.onClick}

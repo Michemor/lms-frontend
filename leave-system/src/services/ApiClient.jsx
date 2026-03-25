@@ -81,7 +81,7 @@ apiClient.interceptors.response.use(
 export const login = async (email, password) => {
   try {
     const response = await apiClient.post('/auth/login/', { email, password });
-    return response; // Return user data and token
+    return response.data; // Return user data and token
   } catch (error) {
     throw new Error('Login failed. Please check your credentials', { cause: error.message });
   }
@@ -90,7 +90,7 @@ export const login = async (email, password) => {
 export const getLeaveHistory = async () => {
   try {
     const response = await apiClient.get('/leaves/history/');
-    return response; // Return leave history data
+    return response.data; // Return leave history data
   } catch (error) {
     throw new Error('Failed to fetch leave history', { cause: error.message });
   }
@@ -111,9 +111,19 @@ export const applyLeave = async (leaveData) => {
       apiData.append('document', leaveData.document);
     }
 
+    console.log('Leave application data being sent:', {
+      leave_type: leaveData.leaveType || leaveData.leave_type,
+      start_date: leaveData.startDate || leaveData.start_date,
+      end_date: leaveData.endDate || leaveData.end_date,
+      reason: leaveData.reason || '',
+      has_document: !!leaveData.document,
+    });
+
     const response = await apiClient.post('/leaves/apply/', apiData);
-    return response;
+    return response.data;
   } catch (error) {
+    console.error('Leave application error response:', error.response?.data);
+    console.error('Full error details:', error);
     throw new Error('Failed to apply for leave', { cause: error.message });
   }
 };
@@ -121,7 +131,7 @@ export const applyLeave = async (leaveData) => {
 export const getAllLeaves = async () => {
   try {
     const response = await apiClient.get('/leaves/all');
-    return response; // Return all leave data
+    return response.data; // Return all leave data
   } catch (error) {
     throw new Error('Failed to fetch all leaves', { cause: error.message });
   }
@@ -131,7 +141,7 @@ export const getAllLeaves = async () => {
 export const updateLeaveData = async (leaveId, leaveData) => {
   try {
     const response = await apiClient.patch(`/leaves/${leaveId}/`, leaveData);
-    return response;
+    return response.data;
   } catch (error) {
     throw new Error('Failed to update leave data', { cause: error.message });
   }
@@ -149,7 +159,7 @@ export const createEmployee = async (employeeData) => {
 export const getPendingLeaves = async () => {
   try {
     const response = await apiClient.get('/leaves/pending/');
-    return response;
+    return response.data;
   } catch (error) {
     throw new Error('Failed to fetch pending leaves', { cause: error.message });
   }
@@ -158,7 +168,7 @@ export const getPendingLeaves = async () => {
 export const getStatistics = async () => {
   try {
     const response = await apiClient.get('/leaves/statistics/');
-    return response;
+    return response.data;
   } catch (error) {
     throw new Error('Failed to fetch statistics', { cause: error.message });
   }
@@ -178,17 +188,34 @@ export const passwordResetRequest = async (email) => {
 // =========================================================
 export const getLeavePolices = async () => {
   try {
-    const response = await apiClient.get('/leave-policies/');
-    return response;
+    // Try primary endpoint
+    try {
+      const response = await apiClient.get('/leave-policies/');
+      console.log('Leave policies fetched from /leave-policies/', response.data);
+      return response.data;
+    } catch (primaryError) {
+      console.warn('Primary endpoint /leave-policies/ failed, trying alternatives...');
+      
+      // Try alternative endpoint
+      try {
+        const response = await apiClient.get('/leave-types/');
+        console.log('Leave policies fetched from /leave-types/', response.data);
+        return response.data;
+      } catch (altError) {
+        console.warn('Alternative endpoint /leave-types/ also failed');
+        throw primaryError; // Throw the primary error
+      }
+    }
   } catch (error) {
-    throw new Error('Failed to fetch leave policies', { cause: error.message });
+    console.error('Error fetching leave policies:', error);
+    throw new Error(`Failed to fetch leave policies: ${error.message}`);
   }
 };
 
 export const getLeavePolicy = async (policyId) => {
   try {
     const response = await apiClient.get(`/leave-policies/${policyId}/`);
-    return response;
+    return response.data;
   } catch (error) {
     throw new Error('Failed to fetch leave policy', { cause: error.message });
   }
@@ -197,7 +224,7 @@ export const getLeavePolicy = async (policyId) => {
 export const createLeavePolicy = async (policyData) => {
   try {
     const response = await apiClient.post('/leave-policies/create/', policyData);
-    return response;
+    return response.data;
   } catch (error) {
     throw new Error('Failed to create leave policy', { cause: error.message });
   }
@@ -206,7 +233,7 @@ export const createLeavePolicy = async (policyData) => {
 export const updateLeavePolicy = async (policyId, policyData) => {
   try {
     const response = await apiClient.patch(`/leave-policies/${policyId}/update/`, policyData);
-    return response;
+    return response.data;
   } catch (error) {
     throw new Error('Failed to update leave policy', { cause: error.message });
   }
@@ -215,7 +242,7 @@ export const updateLeavePolicy = async (policyId, policyData) => {
 export const deleteLeavePolicy = async (policyId) => {
   try {
     const response = await apiClient.delete(`/leave-policies/${policyId}/delete/`);
-    return response;
+    return response.data;
   } catch (error) {
     throw new Error('Failed to delete leave policy', { cause: error.message });
   }
@@ -227,7 +254,7 @@ export const deleteLeavePolicy = async (policyId) => {
 export const getAllEmployees = async () => {
   try {
     const response = await apiClient.get('/employee/list/');
-    return response;
+    return response.data;
   } catch (error) {
     throw new Error('Failed to fetch employees', { cause: error.message });
   }
@@ -236,7 +263,7 @@ export const getAllEmployees = async () => {
 export const getEmployee = async (employeeId) => {
   try {
     const response = await apiClient.get(`/employee/${employeeId}/`);
-    return response;
+    return response.data;
   } catch (error) {
     throw new Error('Failed to fetch employee', { cause: error.message });
   }
@@ -245,7 +272,7 @@ export const getEmployee = async (employeeId) => {
 export const createEmployeeRecord = async (employeeData) => {
   try {
     const response = await apiClient.post('/employee/create/', employeeData);
-    return response;
+    return response.data;
   } catch (error) {
     throw new Error('Failed to create employee', { cause: error.message });
   }
@@ -254,7 +281,7 @@ export const createEmployeeRecord = async (employeeData) => {
 export const updateEmployee = async (employeeId, employeeData) => {
   try {
     const response = await apiClient.post(`/employee/${employeeId}/`, employeeData);
-    return response;
+    return response.data;
   } catch (error) {
     throw new Error('Failed to update employee', { cause: error.message });
   }
@@ -263,7 +290,7 @@ export const updateEmployee = async (employeeId, employeeData) => {
 export const deleteEmployee = async (employeeId) => {
   try {
     const response = await apiClient.delete(`/employee/${employeeId}/delete/`);
-    return response;
+    return response.data;
   } catch (error) {
     throw new Error('Failed to delete employee', { cause: error.message });
   }
@@ -272,7 +299,7 @@ export const deleteEmployee = async (employeeId) => {
 export const listEmployees = async () => {
   try {
     const response = await apiClient.get('/employee/list/');
-    return response;
+    return response.data;
   } catch (error) {
     throw new Error('Failed to list employees', { cause: error.message });
   }

@@ -29,11 +29,11 @@ export default function Login() {
     setIsLoading(true);
     login(email, password)
       .then((response) => {
-        showSuccess(JSON.stringify(response));
-        // Extract token and user data from response
-        const token = response.data.token || response.data.access;
+        showSuccess('Login successful!');
+        // Extract token and user data from response (response is now response.data from API)
+        const token = response.token || response.access;
         // Try to get user object, fallback to entire response if no user object
-        const userData = response.data.user || response.data;
+        const userData = response.user || response;
 
         // Store token in localStorage
         if (token) {
@@ -45,7 +45,6 @@ export default function Login() {
           authLogin(userData, token);
         }
 
-        showSuccess(response.data.message);
         setIsLoading(false);
         // Redirect to the correct dashboard based on user role
         navigate(getCorrectDashboardPath(userData));

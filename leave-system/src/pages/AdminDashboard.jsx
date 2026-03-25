@@ -63,14 +63,14 @@ export default function Dashboard() {
             currentPath={location.pathname}
         >
             {/* Welcome Banner with Add Employee Button */}
-            <div className="flex items-center justify-between bg-slate-900 text-white p-6 rounded-2xl shadow-lg mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold">{greetingText}</h1>
-                    <p className="text-blue-100 mt-2">{subtitleText}</p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-slate-900 text-white p-4 sm:p-6 rounded-lg sm:rounded-2xl shadow-lg mb-6 sm:mb-8 gap-4">
+                <div className="flex-1">
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">{greetingText}</h1>
+                    <p className="text-blue-100 mt-2 text-sm sm:text-base">{subtitleText}</p>
                 </div>
                 <button
                     onClick={() => navigate('/admin/add-employee')}
-                    className="bg-white hover:bg-slate-100 text-slate-900 font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center gap-2 whitespace-nowrap"
+                    className="w-full sm:w-auto bg-white hover:bg-slate-100 text-slate-900 font-bold py-3 px-4 sm:px-6 rounded-lg sm:rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 text-sm sm:text-base min-h-[44px] flex-shrink-0"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -80,26 +80,26 @@ export default function Dashboard() {
             </div>
 
             {/* Leave Stats Grid */}
-            <div className="mb-8">
-                <h2 className="text-2xl font-bold text-slate-900 mb-4">Your Current Leaves</h2>
+            <div className="mb-6 sm:mb-8">
+                <h2 className="text-lg sm:text-2xl font-bold text-slate-900 mb-3 sm:mb-4">Your Current Leaves</h2>
                 <LeaveStats />
             </div>
 
             {/* Leave Requests Table */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-4 md:px-6 py-4 md:py-6 border-b border-slate-200">
-                    <h2 className="text-lg font-bold text-slate-900">Recent Requests</h2>
+            <div className="bg-white rounded-lg sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 border-b border-slate-200">
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900">Recent Requests</h2>
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full text-sm sm:text-base">
                         <thead className="bg-slate-50">
                             <tr>
-                                <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Type</th>
-                                <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Start Date</th>
-                                <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">End Date</th>
-                                <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
-                                <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Remarks</th>
+                                <th className="px-3 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Type</th>
+                                <th className="px-3 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Start Date</th>
+                                <th className="px-3 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">End Date</th>
+                                <th className="px-3 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                                <th className="hidden sm:table-cell px-3 sm:px-4 md:px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Remarks</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -108,22 +108,22 @@ export default function Dashboard() {
                                     // Add safety check for request object
                                     if (!request || !request.id) return null;
                                     return (
-                                        <tr key={request.id} className="border-t border-slate-200 hover:bg-slate-50">
-                                            <td className="px-4 md:px-6 py-4 text-sm font-medium text-slate-900">
+                                        <tr key={request.id} className="border-t border-slate-200 hover:bg-slate-50 transition">
+                                            <td className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium text-slate-900">
                                                 {formatLeaveType(request.leave_type || request.type)}
                                             </td>
-                                            <td className="px-4 md:px-6 py-4 text-sm text-slate-600">
+                                            <td className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-xs sm:text-sm text-slate-600">
                                                 {request.start_date ? formatDate(request.start_date) : 'N/A'}
                                             </td>
-                                            <td className="px-4 md:px-6 py-4 text-sm text-slate-600">
+                                            <td className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-xs sm:text-sm text-slate-600">
                                                 {request.end_date ? formatDate(request.end_date) : 'N/A'}
                                             </td>
-                                            <td className="px-4 md:px-6 py-4 text-sm">
-                                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(request.status || 'pending')}`}>
+                                            <td className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-xs sm:text-sm">
+                                                <span className={`inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(request.status || 'pending')}`}>
                                                     {request.status || 'Pending'}
                                                 </span>
                                             </td>
-                                            <td className="px-4 md:px-6 py-4 text-sm text-slate-600 max-w-xs truncate">
+                                            <td className="hidden sm:table-cell px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-xs sm:text-sm text-slate-600 max-w-xs truncate">
                                                 {request.admin_remarks || '-'}
                                             </td>
                                         </tr>
@@ -131,7 +131,7 @@ export default function Dashboard() {
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan="5" className="px-4 md:px-6 py-8 text-center text-slate-500">
+                                    <td colSpan="5" className="px-3 sm:px-4 md:px-6 py-6 sm:py-8 text-center text-slate-500 text-sm sm:text-base">
                                         No leave requests found
                                     </td>
                                 </tr>

@@ -18,8 +18,46 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
   const [exceedsLimit, setExceedsLimit] = useState(false);
   const [isLoadingPolicies, setIsLoadingPolicies] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [policyError, setPolicyError] = useState(null);
+
+  // Helper: Get default leave policies if API fails (fallback)
+  const getDefaultLeavePolicies = () => [
+    { id: 1, name: 'Annual Leave', max_days: 21 },
+    { id: 2, name: 'Sick Leave', max_days: 7 },
+    { id: 3, name: 'Family Responsibility Leave', max_days: 3 },
+    { id: 4, name: 'Study Leave', max_days: 5 },
+    { id: 5, name: 'Special Leave', max_days: 2 },
+  ];
 
   const { showSuccess, showError, showWarning } = useAlert();
+
+  // Helper: Check if leave type requires document
+  const requiresDocument = (leaveTypeName) => {
+    const name = (leaveTypeName || '').toLowerCase();
+    return name.includes('sick') || name.includes('study');
+  };
+
+  // Helper: Check if leave type is available (Special Leave only in June)
+  const isLeaveTypeAvailable = (leaveTypeName) => {
+    const name = (leaveTypeName || '').toLowerCase();
+    if (name.includes('special')) {
+      const currentMonth = new Date().getMonth() + 1; // 1-12
+      return currentMonth === 6; // June only
+    }
+    return true; // All other types always available
+  };
+
+  // Helper: Get document label for leave type
+  const getDocumentLabel = (leaveTypeName) => {
+    const name = (leaveTypeName || '').toLowerCase();
+    if (name.includes('sick')) {
+      return 'Medical Certificate';
+    }
+    if (name.includes('study')) {
+      return 'Supporting Document';
+    }
+    return 'Document';
+  };
 
   // Get today's date in YYYY-MM-DD format for min date validation
   const getTodayDate = () => {
@@ -48,12 +86,38 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
     const fetchPolicies = async () => {
       try {
         setIsLoadingPolicies(true);
+        setPolicyError(null);
         const data = await getLeavePolices();
-        const policiesArray = Array.isArray(data) ? data : data.results || [];
-        setLeavePolicies(policiesArray);
         
-        // Set initial max days and ID for first policy
+        console.log('Leave Policies API Response:', data);
+        
+        // Handle different response formats
+        let policiesArray = [];
+        if (Array.isArray(data)) {
+          policiesArray = data;
+        } else if (data && typeof data === 'object') {
+          // Try common response formats
+          if (Array.isArray(data.results)) {
+            policiesArray = data.results;
+          } else if (Array.isArray(data.data)) {
+            policiesArray = data.data;
+          } else if (data.results && typeof data.results === 'object') {
+            policiesArray = Object.values(data.results);
+          } else {
+            // Last resort: treat the object itself as an array if it has numeric keys
+            const values = Object.values(data).filter(item => item && typeof item === 'object' && (item.id || item.name));
+            policiesArray = values.length > 0 ? values : [];
+          }
+        }
+        
+        console.log('Processed Policies Array from API:', policiesArray);
+        
+        // If API returns data, use it; otherwise use fallback
         if (policiesArray.length > 0) {
+          setLeavePolicies(policiesArray);
+          setLeavePolicies(policiesArray);
+          
+          // Set initial max days and ID for first policy
           const initialPolicy = policiesArray[0];
           setSelectedPolicyMaxDays(initialPolicy.max_days);
           setFormData(prev => ({
@@ -61,10 +125,27 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
             leaveTypeId: initialPolicy.id,
             leaveTypeName: initialPolicy.name,
           }));
+        } else {
+          throw new Error('API returned empty policies list');
         }
       } catch (error) {
-        console.error('Error fetching leave policies:', error);
-        showWarning('Could not load leave policies. Please try again.');
+        console.error('Error fetching leave policies from API:', error);
+        setPolicyError(`Using default leave types: ${error.message}`);
+        
+        // Always fallback to default leave types
+        const fallbackPolicies = getDefaultLeavePolicies();
+        console.log('Using fallback leave types:', fallbackPolicies);
+        setLeavePolicies(fallbackPolicies);
+        
+        if (fallbackPolicies.length > 0) {
+          const initialPolicy = fallbackPolicies[0];
+          setSelectedPolicyMaxDays(initialPolicy.max_days);
+          setFormData(prev => ({
+            ...prev,
+            leaveTypeId: initialPolicy.id,
+            leaveTypeName: initialPolicy.name,
+          }));
+        }
       } finally {
         setIsLoadingPolicies(false);
       }
@@ -82,6 +163,12 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
       // Find the policy with matching ID
       const selectedPolicy = leavePolicies.find(p => p.id === parseInt(value));
       if (selectedPolicy) {
+        // Check if leave type is available
+        if (!isLeaveTypeAvailable(selectedPolicy.name)) {
+          showWarning(`${selectedPolicy.name} is only available during the month of June.`);
+          return;
+        }
+        
         setFormData((prev) => ({
           ...prev,
           leaveTypeId: selectedPolicy.id,
@@ -138,10 +225,19 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
       return;
     }
 
-    // Check if document is required for sick or study leave
+    // Check if Special Leave is only available in June
     const leaveTypeName = formData.leaveTypeName || '';
-    if ((leaveTypeName.toLowerCase().includes('sick') || leaveTypeName.toLowerCase().includes('study')) && !formData.document) {
-      showWarning('Please upload a document for ' + leaveTypeName);
+    if (leaveTypeName.toLowerCase().includes('special')) {
+      const currentMonth = new Date().getMonth() + 1;
+      if (currentMonth !== 6) {
+        showError('Special Leave is only available during the month of June.');
+        return;
+      }
+    }
+
+    // Check if document is required for sick or study leave
+    if (requiresDocument(leaveTypeName) && !formData.document) {
+      showWarning(`Please upload a ${getDocumentLabel(leaveTypeName).toLowerCase()} for ${leaveTypeName}`);
       return;
     }
 
@@ -158,7 +254,7 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
       };
 
       await applyLeave(submissionData);
-      showSuccess('Leave request submitted successfully!');
+      showSuccess('Leave request submitted for review! The administrator or HR will review your request shortly.');
 
       // Reset form to first policy
       const firstPolicy = leavePolicies[0];
@@ -235,6 +331,40 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
           <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-1 sm:mb-2 pr-8">Request Leave</h3>
           <p className="text-slate-500 text-xs sm:text-sm mb-4 sm:mb-6">Fill in your leave request details</p>
 
+          {/* Required Fields Info */}
+          <div className="mb-5 sm:mb-6 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs sm:text-sm font-semibold text-blue-900 mb-2">Required Information:</p>
+            <ul className="space-y-1.5 text-xs sm:text-sm text-blue-800">
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 font-bold mt-0.5">•</span>
+                <span>Leave type</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 font-bold mt-0.5">•</span>
+                <span>Start date</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 font-bold mt-0.5">•</span>
+                <span>End date</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 font-bold mt-0.5">•</span>
+                <span>Reason for leave</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-600 font-bold mt-0.5">•</span>
+                <span>Supporting document (where required)</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Review Process Info */}
+          <div className="mb-5 sm:mb-6 p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-xs sm:text-sm text-green-800">
+              <span className="font-semibold">📋 Note:</span> After submission, your leave request will be sent to the administrator or HR for review.
+            </p>
+          </div>
+
           {isLoadingPolicies ? (
             <div className="flex items-center justify-center py-8">
               <svg
@@ -270,14 +400,55 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
                   required
                 >
                   <option value="">Select a leave type</option>
-                  {leavePolicies.map(policy => (
-                    <option key={policy.id} value={policy.id}>{policy.name}</option>
-                  ))}
+                  {leavePolicies && leavePolicies.length > 0 ? (
+                    leavePolicies.map(policy => (
+                      <option key={policy.id} value={policy.id}>
+                        {policy.name}
+                        {policy.name.toLowerCase().includes('special') ? ' (June only)' : ''}
+                        {(policy.name.toLowerCase().includes('sick') || policy.name.toLowerCase().includes('study')) ? ' (requires document)' : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>
+                      Loading leave types...
+                    </option>
+                  )}
                 </select>
-                {selectedPolicyMaxDays && (
-                  <p className="text-xs text-slate-600 mt-2">
-                    Maximum allowed: <span className="font-semibold">{selectedPolicyMaxDays} days/year</span>
-                  </p>
+                
+                {leavePolicies.length === 0 && !isLoadingPolicies && (
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-xs text-red-700 font-semibold">
+                      ⚠️ Could not load leave types. Check the browser console for details.
+                    </p>
+                  </div>
+                )}
+                
+                {policyError && (
+                  <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-xs text-yellow-800 font-semibold">
+                      📋 {policyError}
+                    </p>
+                  </div>
+                )}
+                
+                {/* Info about selected leave type */}
+                {formData.leaveTypeName && (
+                  <div className="mt-3 space-y-2">
+                    {formData.leaveTypeName.toLowerCase().includes('special') && (
+                      <div className="p-2 sm:p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                        <p className="text-xs sm:text-sm text-orange-800">
+                          <span className="font-semibold">📅 Note:</span> Special Leave is only available during the month of June.
+                        </p>
+                      </div>
+                    )}
+                    {requiresDocument(formData.leaveTypeName) && (
+                      <div className="p-2 sm:p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                        <p className="text-xs sm:text-sm text-purple-800">
+                          <span className="font-semibold">📎 Required:</span> This leave type requires a {getDocumentLabel(formData.leaveTypeName).toLowerCase()} to be uploaded.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -345,10 +516,10 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
               </div>
 
               {/* Document Upload - Only for Sick Leave and Study Leave */}
-              {(formData.leaveTypeName.toLowerCase().includes('sick') || formData.leaveTypeName.toLowerCase().includes('study')) && (
+              {requiresDocument(formData.leaveTypeName) && (
                 <div>
                   <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2">
-                    {formData.leaveTypeName.toLowerCase().includes('sick') ? 'Medical Certificate' : 'Supporting Document'}
+                    {getDocumentLabel(formData.leaveTypeName)}
                     <span className="text-red-500 ml-1">*</span>
                   </label>
                   <input
