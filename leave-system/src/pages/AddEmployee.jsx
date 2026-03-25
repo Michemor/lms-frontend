@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAlert } from '../hooks/alerthook';
-import { createEmployee } from '../services/ApiClient';
+import { createEmployee, getInstitutions } from '../services/ApiClient';
 import ProtectedLayout from '../components/ProtectedLayout';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
@@ -10,6 +10,22 @@ export default function AddEmployee() {
   const { showSuccess, showError, showWarning } = useAlert();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [branchOptions, setBranchOptions] = useState([]);
+
+   // Fetch branches for institution dropdown on component mount
+    useState(() => {
+      const fetchBranches = async () => {
+        try {
+          const response = await getInstitutions();
+          setBranchOptions(response.data.results);
+        } catch (error) {
+          console.error('Error fetching branches:', error);
+          showError('Failed to load branches. Please refresh the page or contact support.');
+        }
+      };
+      fetchBranches();
+    }, [showError]);
+
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -85,7 +101,7 @@ export default function AddEmployee() {
       password: formData.password,
       department: formData.department,
       position: formData.position,
-      role: formData.role,
+      role: formData.role.toUpperCase(),
       institution: formData.institution,
     };
 
@@ -93,8 +109,9 @@ export default function AddEmployee() {
 
     createEmployee(employeeData)
       .then((response) => {
-        
-          showSuccess(response.message || `Employee created successfully!`);
+          if (response.statusText === 'OK') {
+            showSuccess(response.data.results.message || `Employee created successfully!`);
+          
           // Reset form
           setFormData({
             firstName: '',
@@ -111,14 +128,19 @@ export default function AddEmployee() {
           setTimeout(() => {
             navigate('/admin/dashboard');
           }, 1500);
-      })
+             } else {
+            showError('Failed to create employee. Please try again.');
+          }
+        })
       .catch((error) => {
-        const data = error.response?.data
+        const data = error.response?.error || error.response.data || error.message || 'An unexpected error occurred. Please try again.';
         if (data && typeof data === 'object') {
 
           if (data.status === 0 || data.message) {
             showError(data.message || 'Failed to create employee')
             console.error('Backend exception', data.data)
+            setFieldErrors(data.data || {});
+            setFormData((prev) => ({ ...prev, password: '', confirmPassword: '' })); // Clear passwords on error
             return;
           }
         }
@@ -135,9 +157,11 @@ export default function AddEmployee() {
             department: '',
             position: '',
             role: '',
-            phoneNumber: ''
+            phoneNumber: '',
+            institution: ''
           });
-      });
+         setFieldErrors({}); // Clear field errors on completion
+          });
   };
 
   const handleCancel = () => {
@@ -250,22 +274,22 @@ export default function AddEmployee() {
               {/* Institution */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Institution *</label>
-                <input
-                  type="text"
+               
+                <select
                   name="institution"
                   value={formData.institution}
                   onChange={handleChange}
-                  placeholder="e.g., Institution ID or name"
-                  className={`w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 outline-none transition-all ${fieldErrors.institution
-                    ? 'border-red-400 focus:ring-red-300 bg-red-50'
-                    : 'border-slate-200 focus:ring-blue-500'
-                    }`}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                   disabled={isLoading}
                   required
-                />
-                {fieldErrors.institution && (
-                  <p className="text-red-500 text-xs mt-1 font-medium">{fieldErrors.institution}</p>
-                )}
+                >
+                  <option value="">Select an institution</option>
+                  {branchOptions.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Role */}

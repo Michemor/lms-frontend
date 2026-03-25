@@ -14,7 +14,9 @@ export default function AdminBranches() {
   // create institution
   const createBranch = async (branchData) => {
     try {
+      console.log('Creating branch with data:', branchData);
       const response = await createInstitution(branchData);
+      console.log(response.data);
       setBranches(prev => [...prev, response.data]);
       showSuccess('Branch added successfully!');
     } catch (error) {
@@ -52,7 +54,8 @@ export default function AdminBranches() {
     const fetchBranches = async () => {
       try {
         const response = await getInstitutions();
-        setBranches(response.data);
+        console.log('API Response:', response.data);
+        setBranches(response.data.results);
       }
       catch (error) {
         console.error('Error fetching branches:', error);
@@ -92,20 +95,11 @@ export default function AdminBranches() {
     if (!formData.name.trim()) {
       newErrors.name = 'Branch name is required';
     }
-    if (!formData.location.trim()) {
-      newErrors.location = 'Location is required';
-    }
-    if (!formData.code.trim()) {
-      newErrors.code = 'Branch code is required';
-    } else if (formData.code.length > 10) {
-      newErrors.code = 'Branch code should be 10 characters or less';
-    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleAddBranch = () => {
-    createBranch(formData);
     setIsEditing(false);
     setEditingId(null);
     setFormData({ name: ''});
@@ -156,16 +150,22 @@ export default function AdminBranches() {
         showSuccess('Branch added successfully!');
       }
       setIsModalOpen(false);
-      setFormData({ name: '', location: '', code: '' });
+      setFormData({ name: '' });
     } catch (error) {
       console.error('Error saving branch:', error);
       showError('Failed to save branch. Please try again.');
+    } finally {
+      setIsEditing(false);
+      setEditingId(null);
+      setFormData({ name: '' });
+      setErrors({});
+      setIsModalOpen(true);
     }
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setFormData({ name: '', location: '', code: '' });
+    setFormData({ name: '' });
     setErrors({});
     setIsEditing(false);
     setEditingId(null);
@@ -221,8 +221,6 @@ export default function AdminBranches() {
                 <thead>
                   <tr className="bg-slate-100 border-b border-slate-200">
                     <th className="px-4 sm:px-6 py-4 text-left text-xs font-bold text-slate-900">Branch Name</th>
-                    <th className="hidden md:table-cell px-4 sm:px-6 py-4 text-left text-xs font-bold text-slate-900">Location</th>
-                    <th className="hidden sm:table-cell px-4 sm:px-6 py-4 text-left text-xs font-bold text-slate-900">Code</th>
                     <th className="px-4 sm:px-6 py-4 text-center text-xs font-bold text-slate-900">Actions</th>
                   </tr>
                 </thead>
@@ -232,14 +230,6 @@ export default function AdminBranches() {
                       <tr key={branch.id} className="border-b border-slate-200 hover:bg-slate-50 transition">
                         <td className="px-4 sm:px-6 py-4 text-sm font-semibold text-slate-900">
                           {branch.name}
-                        </td>
-                        <td className="hidden md:table-cell px-4 sm:px-6 py-4 text-sm text-slate-600">
-                          📍 {branch.location}
-                        </td>
-                        <td className="hidden sm:table-cell px-4 sm:px-6 py-4 text-sm text-slate-600">
-                          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold">
-                            {branch.code}
-                          </span>
                         </td>
                         <td className="px-4 sm:px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-2">
@@ -269,7 +259,7 @@ export default function AdminBranches() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="4" className="px-4 sm:px-6 py-8 text-center text-slate-500">
+                      <td colSpan="2" className="px-4 sm:px-6 py-8 text-center text-slate-500">
                         No branches found. Click "Add New Branch" to create one.
                       </td>
                     </tr>
@@ -320,7 +310,7 @@ export default function AdminBranches() {
                     name="name"
                     value={formData.name}
                     onChange={handleFormChange}
-                    placeholder="e.g., New Haven Academy"
+                    placeholder="e.g., Main Campus"
                     className={`w-full px-4 py-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm ${
                       errors.name ? 'border-red-500' : 'border-slate-200'
                     }`}
@@ -329,50 +319,6 @@ export default function AdminBranches() {
                   {errors.name && (
                     <p className="text-red-600 text-xs mt-1">{errors.name}</p>
                   )}
-                </div>
-
-                {/* Location */}
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Location <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="location"
-                    value={formData.location}
-                    onChange={handleFormChange}
-                    placeholder="e.g., New Haven"
-                    className={`w-full px-4 py-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm ${
-                      errors.location ? 'border-red-500' : 'border-slate-200'
-                    }`}
-                    required
-                  />
-                  {errors.location && (
-                    <p className="text-red-600 text-xs mt-1">{errors.location}</p>
-                  )}
-                </div>
-
-                {/* Branch Code */}
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Branch Code <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="code"
-                    value={formData.code}
-                    onChange={(e) => handleFormChange({ ...e, target: { ...e.target, value: e.target.value.toUpperCase() } })}
-                    placeholder="e.g., NHA"
-                    maxLength="10"
-                    className={`w-full px-4 py-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm ${
-                      errors.code ? 'border-red-500' : 'border-slate-200'
-                    }`}
-                    required
-                  />
-                  {errors.code && (
-                    <p className="text-red-600 text-xs mt-1">{errors.code}</p>
-                  )}
-                  <p className="text-xs text-slate-500 mt-1">Max 10 characters (uppercase)</p>
                 </div>
 
                 {/* Submit and Cancel Buttons */}
