@@ -86,6 +86,7 @@ export const login = async (email, password) => {
     const response = await apiClient.post('/auth/login/', { email, password });
     return response;
   } catch (error) {
+    console.error('Login error response:', error);
     throw new Error('Login failed. Please check your credentials', { cause: error.message });
   }
 };

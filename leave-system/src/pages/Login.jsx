@@ -20,6 +20,7 @@ export default function Login() {
 
   const handleLogin = (e) => {
     e.preventDefault();
+    
     // validate if fields are empty first
     if (!email || !password) {
       showWarning('Please enter both email and password.');
@@ -29,11 +30,12 @@ export default function Login() {
     setIsLoading(true);
     login(email, password)
       .then((response) => {
+        console.log('Login response:', response);
         showSuccess('Login successful! Redirecting to dashboard...');
         // Extract token and user data from response
-        const token = response.data.access || response.data.access;
+        const token = response.data.results.access;
         // Try to get user object, fallback to entire response if no user object
-        const userData = response.data.employee;
+        const userData = response.data.results.employee;
 
         // Store token in localStorage
         if (token) {
