@@ -15,6 +15,7 @@ import AdminBranches from "./pages/AdminBranches.jsx";
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
 
       {/* Protected Employee Routes */}
