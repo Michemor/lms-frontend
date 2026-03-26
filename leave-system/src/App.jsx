@@ -11,6 +11,7 @@ import AddEmployee from "./pages/AddEmployee.jsx";
 import AdminManageLeaves from "./pages/AdminManageLeaves.jsx";
 import AdminEmployeeManagement from "./pages/AdminEmployeeManagement.jsx";
 import AdminBranches from "./pages/AdminBranches.jsx";
+import SetPassword from "./pages/SetPassword.jsx";
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
       <Route path="/my-requests" element={<MyRequests />} />
       <Route path="/history" element={<History />} />
       <Route path="/calendar" element={<LeaveCalendar />} />
+      <Route path = "/set-password/:uid/:token" element={<SetPassword />} />
 
       {/* Protected Admin Routes */}
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
