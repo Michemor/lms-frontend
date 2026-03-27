@@ -14,29 +14,31 @@ export default function LeaveCalendar() {
   const [leaveEvents, setLeaveEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
+// LeaveCalendar.jsx
   useEffect(() => {
     const fetchLeaveEvents = async () => {
       try {
         setIsLoading(true);
-        const data = await getMyLeaves();
+        const res = await getMyLeaves();
+        const rawData = res.data; // Unpack the Axios payload
 
-        if (data) {
-        // Handle both array and paginated response formats
-        const leaveData = Array.isArray(data) ? data : data.results || [];
-        
-        // Create events for all leaves (not just approved, so user can see pending too)
-        const events = leaveData.map(leave => ({
-          date: leave.start_date,
-          endDate: leave.end_date,
-          type: leave.leave_type || leave.type,
-          title: leave.reason || '',
-          status: leave.status || 'pending',
-        }));
-        
-        setLeaveEvents(events);
-      } else {
-        showError('No leave data found.');
-      }
+        if (rawData) {
+          // Handle both array and paginated response formats
+          const leaveData = Array.isArray(rawData) ? rawData : rawData.results || [];
+          
+          // Map events including the hydrated leave_type_name
+          const events = leaveData.map(leave => ({
+            date: leave.start_date,
+            endDate: leave.end_date,
+            type: leave.leave_type_name || leave.leave_type || leave.type || 'Leave',
+            title: leave.reason || '',
+            status: leave.status || 'pending',
+          }));
+          
+          setLeaveEvents(events);
+        } else {
+          showError('No leave data found.');
+        }
       } catch (error) {
         console.error('Error fetching leave events:', error);
       } finally {
@@ -45,7 +47,7 @@ export default function LeaveCalendar() {
     };
 
     fetchLeaveEvents();
-  }, [showError]);
+  }, [showError]); // Keep dependencies clean
 
   const getDaysInMonth = (date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -69,16 +71,25 @@ export default function LeaveCalendar() {
 
   const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  const hasLeaveOnDate = (day) => {
-    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return leaveEvents.some(e => e.date.startsWith(dateStr));
-  };
+  const getLeavesForDate = (day) => {
+    if (!day) return [];
 
-  const getLeaveOnDate = (day) => {
-    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return leaveEvents.find(e => e.date.startsWith(dateStr));
-  };
+    const cellDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    cellDate.setHours(0, 0, 0, 0);
+    return leaveEvents.filter(event => {
+      if (!event.date || !event.endDate) return false;
 
+      const [sYear, sMonth, sDay] = event.date.split('-').map(Number);
+      const start = new Date(sYear, sMonth - 1, sDay);
+      start.setHours(0, 0, 0, 0);
+
+      const [eYear, eMonth, eDay] = event.endDate.split('-').map(Number);
+      const end = new Date(eYear, eMonth - 1, eDay);
+      end.setHours(0, 0, 0, 0);
+
+      return cellDate >= start && cellDate <= end;
+    })
+  }
   const prevMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
   };
@@ -155,9 +166,10 @@ export default function LeaveCalendar() {
         {/* Calendar days */}
         <div className="grid grid-cols-7 gap-1">
           {days.map((day, index) => {
-            const hasLeave = day && hasLeaveOnDate(day);
-            const leaveData = day && getLeaveOnDate(day);
-            const bgColor = hasLeave && leaveData ? getLeaveColor(leaveData.status) : 'bg-white border-slate-200';
+            const leavesonDay = day ? getLeavesForDate(day) : [];
+            const hasLeave = leavesonDay.length > 0;
+
+            const bgColor = hasLeave ? getLeaveColor(leavesonDay[0].status) : 'bg-white border-slate-200';
             
             return (
               <div
@@ -167,14 +179,14 @@ export default function LeaveCalendar() {
                     ? 'bg-slate-50 border-transparent'
                     : bgColor
                 }`}
-                title={hasLeave && leaveData ? `${leaveData.type} (${leaveData.status || 'pending'})` : ''}
+                title={hasLeave && leavesonDay[0] ? `${leavesonDay[0].type} (${leavesonDay[0].status || 'pending'})` : ''}
               >
                 {day && (
                   <>
                     <div className="font-bold text-slate-900">{day}</div>
-                    {hasLeave && leaveData && (
-                      <div className={`mt-1 text-xs ${getLeaveStatusBadgeColor(leaveData.status)} text-white px-1 py-0.5 rounded truncate`}>
-                        {leaveData.type}
+                    {hasLeave && leavesonDay[0] && (
+                      <div className={`mt-1 text-xs ${getLeaveStatusBadgeColor(leavesonDay[0].status)} text-white px-1 py-0.5 rounded truncate`}>
+                        {leavesonDay[0].type}
                       </div>
                     )}
                   </>

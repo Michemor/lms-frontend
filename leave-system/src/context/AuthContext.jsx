@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../hooks/authhook";
 import { useState } from "react";
+import { getCurrentUser } from "../services/ApiClient";
 
 export const AuthProvider = ({ children }) => {
     const navigate = useNavigate();
@@ -19,6 +20,20 @@ export const AuthProvider = ({ children }) => {
             return null;
         }
     });
+
+    const refreshUser = async () => {
+        try {
+            const response = await getCurrentUser();
+            const updatedUser = response.data;
+            setUser(updatedUser);
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+        } catch (error) {
+            console.error('Error refreshing user data:', error);
+            // Optionally, you could log the user out if refreshing fails
+            // logout();
+        }
+    };
+
 
     const login = (userData, token) => {
         // Ensure all user data is preserved
@@ -52,7 +67,11 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout }}>
+        <AuthContext.Provider value={{ 
+            user, 
+            refreshUser,
+            login, 
+            logout }}>
             {children}
         </AuthContext.Provider>
     );

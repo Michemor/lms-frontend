@@ -24,27 +24,60 @@ const getStatusColor = (status) => {
 };
 
 // Request Card Component
+
 const RequestCard = ({ request }) => {
   if (!request || !request.id) return null;
 
   return (
-    <div className="bg-white rounded-xl shadow p-6 border border-slate-200 hover:shadow-md transition-shadow">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+    <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 hover:shadow-md transition-all group">
+      <div className="flex justify-between items-start mb-4">
         <div>
-          <h3 className="font-bold text-slate-900 text-lg">{request.leave_type || request.type || 'Leave'}</h3>
-          <p className="text-slate-600 text-sm">{formatDate(request.start_date)} to {formatDate(request.end_date)}</p>
-          <p className="text-slate-500 text-sm mt-2">Reason: {request.reason || '-'}</p>
-          <p className="text-slate-400 text-xs mt-1">Submitted: {formatDate(request.created_at || new Date().toISOString())}</p>
+          <h3 className="font-black text-slate-900 text-lg leading-tight">
+            {request.leave_type_name || request.leave_type || 'Leave Request'}
+          </h3>
+          <p className="text-slate-500 text-xs mt-1 font-medium">{request.institution_name}</p>
         </div>
-        <div></div>
-        <div className="md:text-right">
-          <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${getStatusColor(request.status || 'pending')}`}>
-            {request.status || 'Pending'}
+        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${getStatusColor(request.status)}`}>
+          {request.status || 'Pending'}
+        </span>
+      </div>
+      
+      <div className="flex items-center gap-4 py-3 border-y border-slate-50 my-4">
+        <div className="flex-1">
+          <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">From</p>
+          <p className="text-sm font-bold text-slate-700">{formatDate(request.start_date)}</p>
+        </div>
+        <div className="h-8 w-px bg-slate-100"></div>
+        <div className="flex-1">
+          <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">To</p>
+          <p className="text-sm font-bold text-slate-700">{formatDate(request.end_date)}</p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-slate-400">Duration:</span>
+          <span className="text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">
+            {request.leave_duration || 'N/A'} days
           </span>
-          {request.admin_remarks && (
-            <p className="text-slate-600 text-xs mt-3 md:text-right">Admin: {request.admin_remarks}</p>
-          )}
         </div>
+        <p className="text-slate-600 text-sm line-clamp-2 italic">"{request.reason || 'No reason provided'}"</p>
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-slate-50 flex justify-between items-center">
+        <p className="text-slate-400 text-[10px] font-medium">
+          Submitted {formatDate(request.created_at || new Date().toISOString())}
+        </p>
+        {request.supporting_document && (
+          <a 
+            href={request.supporting_document} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-600 text-xs font-bold hover:underline"
+          >
+            View Document
+          </a>
+        )}
       </div>
     </div>
   );
@@ -81,8 +114,8 @@ export default function MyRequests() {
   useEffect(() => {
     const fetchLeaveHistory = async () => {
       try {
-
-        const leaveData = await getMyLeaves();
+        const res = await getMyLeaves();
+        const leaveData = res.data;
         if (!leaveData) {
           showError('No leave data found.');
           return;
@@ -110,21 +143,53 @@ export default function MyRequests() {
   const approvedRequests = getRequestsByStatus('approved');
   const rejectedRequests = getRequestsByStatus('rejected');
 
+  const pendingCategory = pendingRequests.reduce((acc, req) => {
+    const type = req.leave_type_name || req.leave_type || req.type || 'Other';
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(req);
+    return acc;
+  }, {});
+
   return (
     <ProtectedLayout
       title="My Leave Requests"
       subtitle="View all your submitted leave requests"
       currentPath={location.pathname}
     >
-      <div className="space-y-8">
-        {/* Pending Requests */}
-        <StatusSection
-          title="Pending Requests"
-          requests={pendingRequests}
-          icon="⏳"
-          bgColor="bg-yellow-50 border border-yellow-200"
-        />
+      {/** Pending requests */}
+      <div className="space-y-12">
+       <section className="mb-12">
+          <div className="flex items-center gap-3 mb-6 p-4 rounded-xl bg-yellow-50 border border-yellow-200">
+            <span className="text-2xl">⏳</span>
+            <div>
+              <h3 className="text-xl font-black text-slate-900">
+                Pending Requests ({pendingRequests.length})
+              </h3>
+            </div>
+          </div>
 
+          {Object.keys(pendingCategory).length > 0 ? (
+            Object.entries(pendingCategory).map(([type, reqs]) => (
+              <div key={type} className="mb-8 last:mb-0">
+                <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 border-l-4 border-yellow-400 pl-3">
+                  {type}
+                </h4>
+                
+                {/* Changed to a grid layout so cards sit nicely side-by-side on larger screens */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {reqs.map((req) => (
+                    <RequestCard key={req.id} request={req} />
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="bg-slate-50 rounded-2xl p-8 text-center border border-dashed border-slate-300">
+              <p className="text-slate-500">No pending requests</p>
+            </div>
+          )}
+        </section>
+       
         {/* Approved Requests */}
         <StatusSection
           title="Approved Requests"

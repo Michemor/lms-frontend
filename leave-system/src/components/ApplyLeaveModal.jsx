@@ -11,12 +11,12 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
     document: null,
   });
 
-  const [leaveTypes, setLeaveTypes] = useState([]);
+  const [leavetypes, setLeavetypes] = useState([]);
   const [selectedTypeMaxDays, setSelectedTypeMaxDays] = useState(null);
   const [daysRequested, setDaysRequested] = useState(0);
   const [exceedsLimit, setExceedsLimit] = useState(false);
   const [unpaidLeaveDays, setUnpaidLeaveDays] = useState(0);
-  const [isLoadingPolicies, setIsLoadingPolicies] = useState(true);
+  const [isLoadingtypes, setIsLoadingtypes] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { showSuccess, showError, showWarning } = useAlert();
@@ -61,21 +61,18 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
     }
   };
 
-  // Fetch leave policies on mount
+  // Fetch leave types on mount
   useEffect(() => {
-    const fetchPolicies = async () => {
+    const fetchtypes = async () => {
       try {
-        setIsLoadingPolicies(true);
         const data = await getLeaveTypes();
-        const policiesArray = Array.isArray(data) ? data : data.results || [];
-        setLeaveTypes(policiesArray);
+        const typesArray = Array.isArray(data) ? data : data.results || [];
         
-        // Set initial max days and ID for first policy
-        if (policiesArray.length > 0) {
-          setLeaveTypes(policiesArray);
+        if (typesArray.length > 0) {
+          setLeavetypes(typesArray);
           
           // Set initial max days and ID for first policy
-          const initialPolicy = policiesArray[0];
+          const initialPolicy = typesArray[0];
           setSelectedTypeMaxDays(initialPolicy.max_days);
           setFormData(prev => ({
             ...prev,
@@ -83,28 +80,28 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
             leaveTypeName: initialPolicy.name,
           }));
         } else {
-          throw new Error('API returned empty policies list');
+          throw new Error('API returned empty types list');
         }
       } catch (error) {
-        console.error('Error fetching leave policies from API:', error);
-        setLeaveTypes([]);
+        console.error('Error fetching leave types from API:', error);
+        setLeavetypes([]);
         showError('Failed to load leave types. Please refresh the page or contact support.');
       } finally {
-        setIsLoadingPolicies(false);
+        setIsLoadingtypes(false);
       }
     };
 
     if (isOpen) {
-      fetchPolicies();
+      fetchtypes();
     }
-  }, []);
+  }, [isOpen]);
 
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
 
     if (name === 'leaveType') {
       // Find the type with matching ID
-      const selectedType = leaveTypes.find(t => t.id === parseInt(value));
+      const selectedType = leavetypes.find(t => String(t.id) === String(value));
       if (selectedType) {
         setFormData((prev) => ({
           ...prev,
@@ -191,9 +188,7 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
         document: formData.document,
       };
 
-      await applyLeave(submissionData);
-      console.log('Leave application submitted successfully', submissionData);
-      
+      const res = await applyLeave(submissionData);
       // Construct success message with unpaid leave info if applicable
       let successMessage = 'Leave request submitted for review! The administrator or HR will review your request shortly.';
       if (unpaidLeaveDays > 0) {
@@ -202,7 +197,7 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
       showSuccess(successMessage);
 
       // Reset form to first policy
-      const firstType = leaveTypes[0];
+      const firstType = leavetypes[0];
       setFormData({
         leaveTypeId: firstType?.id || null,
         leaveTypeName: firstType?.name || '',
@@ -213,10 +208,11 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
       });
       setDaysRequested(0);
       setUnpaidLeaveDays(0);
+      setExceedsLimit(false);
 
       // Call parent callback to refresh history if provided
       if (typeof onSubmitSuccess === 'function') {
-        onSubmitSuccess();
+        onSubmitSuccess(res);
       }
 
       onClose();
@@ -311,7 +307,7 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
             </p>
           </div>
 
-          {isLoadingPolicies ? (
+          {isLoadingtypes ? (
             <div className="flex items-center justify-center py-8">
               <svg
                 className="animate-spin h-6 w-6 text-slate-900"
@@ -346,7 +342,7 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
                   required
                 >
                   <option value="">Select a leave type</option>
-                  {leaveTypes.map(type => (
+                  {leavetypes.map(type => (
                     <option key={type.id} value={type.id}>{type.name}</option>
                   ))}
                 </select>
@@ -469,7 +465,7 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
 
               <button
                 type="submit"
-                disabled={exceedsLimit || isLoadingPolicies || isSubmitting}
+                disabled={exceedsLimit || isLoadingtypes || isSubmitting}
                 className="w-full bg-slate-900 hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg sm:rounded-xl transition-all shadow-lg text-sm sm:text-base min-h-[44px] flex items-center justify-center"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Request'}

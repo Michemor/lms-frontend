@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react';
 import { getMyLeaves } from '../services/ApiClient';
 import { getUserDisplayName } from '../utils/userUtils';
 import ProtectedLayout from '../components/ProtectedLayout';
-import LeaveStats from '../components/LeaveStats';
 import ApplyLeaveModal from '../components/ApplyLeaveModal';
+import ApprovedLeaveCard from '../components/LeaveStats';
 
 export default function Dashboard() {
     const location = useLocation();
@@ -28,13 +28,14 @@ export default function Dashboard() {
     useEffect(() => {
         const fetchLeaveRequests = async () => {
             try {
-                const data = await getMyLeaves();
+                const res = await getMyLeaves();
+                const data = res.data.results;
                 if (!data){
                     showInfo('No leave requests found.');
                     return;
                 }
                 // Handle both array and paginated response formats
-                const leaveData = Array.isArray(data) ? data : data.results || [];
+                const leaveData = Array.isArray(data) ? data : [];
 
                 // Filter out any undefined/null entries
                 const validLeaves = leaveData.filter(leave => leave && leave.id);
@@ -47,7 +48,7 @@ export default function Dashboard() {
                 setLeaveRequests(formattedLeaveData);
             } catch (error) {
                 console.error('Error fetching leave requests:', error);
-
+                showError('Failed to fetch leave requests.');
             }
         };
 
@@ -77,7 +78,7 @@ export default function Dashboard() {
             {/* Leave Stats Grid */}
             <div className="mb-6 sm:mb-8">
                 <h2 className="text-lg sm:text-2xl font-bold text-slate-900 mb-3 sm:mb-4">Your Current Leaves</h2>
-                <LeaveStats />
+                <ApprovedLeaveCard leave={leaveRequests[0]} /> {/* Display the first approved leave */}
             </div>
 
             {/* Leave Requests Table */}

@@ -29,13 +29,15 @@ export default function Login() {
     setIsLoading(true);
     login(email, password)
       .then((response) => {
-        showSuccess('Login successful! Redirecting to dashboard...');
-        // Extract token and user data from response
-        const token = response.data.access || response.data.access;
-        // Try to get user object, fallback to entire response if no user object
+        const token = response.data.access;
         const userData = response.data.employee;
 
-        // Store token in localStorage
+        if (userData.must_reset_password) {
+          showInfo('Successful Login, redirectng to set a new password')
+        } else {
+          showSuccess('Login Successful! Redirecting to dashboard....')
+        }
+      // Store token in localStorage
         if (token) {
           localStorage.setItem('token', token);
         }

@@ -17,7 +17,7 @@ import { GiHamburgerMenu } from 'react-icons/gi';
 export default function ProtectedLayout({ children, title, subtitle, action }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const { showError } = useAlert();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -28,43 +28,80 @@ export default function ProtectedLayout({ children, title, subtitle, action }) {
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const data = await getMyLeaves();
-        const leaveData = data.data.results
+        const res = await getMyLeaves();
+        const rawData = res.data;
         
-        // Filter approved leaves and calculate remaining days
+        if (!rawData) return;
+
+        // Safely handle both array and paginated response formats
+        const leaveData = Array.isArray(rawData) ? rawData : rawData.results || [];
+        
+        // Filter ONLY approved leaves
         const approvedLeaves = leaveData.filter(leave => 
-          leave.status === 'approved' || leave.status === 'Approved'
+          leave && leave.id && (leave.status || '').toLowerCase() === 'approved'
         );
         
-        const activeNotifications = approvedLeaves
-          .map(leave => {
-            const start = new Date(leave.start_date);
-            const end = new Date(leave.end_date);
-            const today = new Date();
-            
-            const totalLeaveDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-            let totalUsedDays = 0;
-            
-            if (today >= start) {
-              if (today >= end) {
-                totalUsedDays = totalLeaveDays;
-              } else {
-                totalUsedDays = Math.ceil((today - start) / (1000 * 60 * 60 * 24)) + 1;
-              }
-            }
-            
-            const remainingDays = Math.max(totalLeaveDays - totalUsedDays, 0);
-            
-            return {
-              ...leave,
-              remainingDays,
-              leaveType: leave.leave_type || leave.type
-            };
-          })
-          .filter(leave => leave.remainingDays >= 0 && leave.remainingDays <= 3)
-          .sort((a, b) => a.remainingDays - b.remainingDays);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Normalize to midnight
         
+        const activeNotifications = approvedLeaves.map;
+
+        approvedLeaves.forEach(leave => {
+            const start = new Date(leave.start_date);
+            start.setHours(0, 0, 0, 0);
+            
+            const end = new Date(leave.end_date);
+            end.setHours(0, 0, 0, 0);
+            
+            const daysUntilStart = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
+            const daysUntilEnd = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
+
+            let alertMessage = '';
+            let alertColor = '';
+            let alertIcon = '';
+
+            // Scenario 1: Leave is upcoming (Starts in 1 to 7 days)
+            if (daysUntilStart > 0 && daysUntilStart <= 7) {
+                alertMessage = `Starts in ${daysUntilStart} day${daysUntilStart !== 1 ? 's' : ''}`;
+                alertColor = 'bg-blue-50 border-blue-500 text-blue-900';
+                alertIcon = '📅';
+            } 
+            // Scenario 2: Currently ON leave
+            else if (daysUntilStart <= 0 && daysUntilEnd >= 0) {
+                if (daysUntilEnd === 0) {
+                    alertMessage = 'Ends today!';
+                    alertColor = 'bg-red-50 border-red-500 text-red-900';
+                    alertIcon = '⚠️';
+                } else if (daysUntilEnd <= 2) {
+                    alertMessage = `Ends in ${daysUntilEnd} days!`;
+                    alertColor = 'bg-orange-50 border-orange-500 text-orange-900';
+                    alertIcon = '⏳';
+                } else {
+                    alertMessage = 'Currently Active';
+                    alertColor = 'bg-green-50 border-green-500 text-green-900';
+                    alertIcon = '✅';
+                }
+            }
+
+            // Only push if it fits our notification criteria
+            if (alertMessage) {
+                activeNotifications.push({
+                    ...leave,
+                    leaveTypeLabel: leave.leave_type_name || leave.leave_type || 'Leave',
+                    alertMessage,
+                    alertColor,
+                    alertIcon,
+                    sortWeight: daysUntilStart > 0 ? daysUntilStart : daysUntilEnd // Used for sorting
+                });
+            }
+
+           
+            });
+
+        // Sort so the most urgent notifications appear at the top
+        activeNotifications.sort((a, b) => a.sortWeight - b.sortWeight);
         setNotifications(activeNotifications);
+        
       } catch (error) {
         console.error('Error fetching notifications:', error);
       }
@@ -104,6 +141,18 @@ export default function ProtectedLayout({ children, title, subtitle, action }) {
     navigate('/login');
   };
 
+  const handleNotificationClick = () => {
+    setIsNotificationOpen(false);
+    const userRole = String(user?.role || '').toUpperCase();
+
+    if (['ADMIN', 'MANAGER', 'HR'].includes(userRole)) {
+      navigate(`/admin/applications`);
+    } else {  
+      navigate(`/my-requests`);
+    }
+  };
+
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar Component */}
@@ -141,11 +190,17 @@ export default function ProtectedLayout({ children, title, subtitle, action }) {
                 <div className="relative" ref={notificationRef}>
                   <button
                     onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-                    className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition min-h-[44px]"
+                    className="relative flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition min-h-[44px]"
                     title="Click to see notifications"
                   >
                     <span className="text-lg">🔔</span>
                     <span className="hidden sm:inline text-sm font-semibold text-blue-700">Notifications</span>
+
+                    {notifications.length > 0 && (
+                      <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-white shadow-sm">
+                        {notifications.length}
+                      </span>
+                    )}
                   </button>
 
                   {/* Notifications Dropdown */}
@@ -161,52 +216,35 @@ export default function ProtectedLayout({ children, title, subtitle, action }) {
                             <p className="text-sm">No notifications</p>
                           </div>
                         ) : (
-                          <div className="divide-y divide-slate-200">
-                            {notifications.map((leave) => {
-                              const leaveTypeLabel = {
-                                'ANN': 'Annual Leave',
-                                'SICK': 'Sick Leave',
-                                'FAMILY': 'Family Responsibility Leave',
-                                'STUDY': 'Study Leave',
-                                'SPECIAL': 'Special Leave',
-                              }[leave.leaveType] || leave.leaveType;
-
-                              let alertColor = 'bg-blue-50 border-l-4 border-blue-500';
-                              let alertIcon = '📅';
-                              let alertMessage = '';
-
-                              if (leave.remainingDays === 0) {
-                                alertColor = 'bg-red-50 border-l-4 border-red-500';
-                                alertIcon = '🚨';
-                                alertMessage = 'Last day!';
-                              } else if (leave.remainingDays === 1) {
-                                alertColor = 'bg-red-50 border-l-4 border-red-500';
-                                alertIcon = '🚨';
-                                alertMessage = '1 day left!';
-                              } else if (leave.remainingDays === 2) {
-                                alertColor = 'bg-orange-50 border-l-4 border-orange-500';
-                                alertIcon = '⚡';
-                                alertMessage = '2 days left!';
-                              } else if (leave.remainingDays === 3) {
-                                alertColor = 'bg-blue-50 border-l-4 border-blue-500';
-                                alertIcon = '📅';
-                                alertMessage = '3 days left!';
-                              }
-
-                              return (
-                                <div key={leave.id} className={`p-3 ${alertColor}`}>
-                                  <div className="flex items-start gap-2">
-                                    <span className="text-lg flex-shrink-0">{alertIcon}</span>
-                                    <div className="min-w-0 flex-1">
-                                      <p className="font-semibold text-slate-900 text-sm truncate">{leaveTypeLabel}</p>
-                                      <p className="text-xs text-slate-600 mt-1">{alertMessage}</p>
-                                      <p className="text-xs text-slate-500 mt-1">{leave.start_date} to {leave.end_date}</p>
-                                    </div>
+                          <div className="max-h-96 overflow-y-auto p-2">
+                        {notifications.length === 0 ? (
+                          <div className="p-8 text-center text-slate-500 flex flex-col items-center">
+                            <span className="text-3xl mb-2 opacity-50">📭</span>
+                            <p className="text-sm font-medium">You're all caught up!</p>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            {notifications.map((leave) => (
+                              <button 
+                                key={leave.id} 
+                                onClick={handleNotificationClick}
+                                className={`w-full text-left p-3 rounded-lg border-l-4 transition-all hover:opacity-80 hover:shadow-md cursor-pointer ${leave.alertColor}`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <span className="text-lg flex-shrink-0 mt-0.5">{leave.alertIcon}</span>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-bold text-sm truncate">{leave.leaveTypeLabel}</p>
+                                    <p className="text-xs font-semibold mt-0.5">{leave.alertMessage}</p>
+                                    <p className="text-[10px] text-slate-500 mt-1 opacity-80 font-medium">
+                                      {leave.start_date} to {leave.end_date}
+                                    </p>
                                   </div>
                                 </div>
-                              );
-                            })}
+                              </button>
+                            ))}
                           </div>
+                        )}
+                      </div>
                         )}
                       </div>
                     </div>

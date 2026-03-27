@@ -2,10 +2,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/authhook';
 import { useAlert } from '../hooks/alerthook';
 import { useEffect, useState } from 'react';
-import { listLeaves, getMyLeaves } from '../services/ApiClient';
+import { listLeaves, getMyLeaves, getPendingLeaves } from '../services/ApiClient';
 import { getUserDisplayName } from '../utils/userUtils';
 import ProtectedLayout from '../components/ProtectedLayout';
-import LeaveStats from '../components/LeaveStats';
+import ApprovedLeaveCard from '../components/LeaveStats';
 import ApplyLeaveModal from '../components/ApplyLeaveModal';
 
 export default function Dashboard() {
@@ -15,6 +15,7 @@ export default function Dashboard() {
     const { showError, showSuccess } = useAlert();
     const [leaveRequests, setLeaveRequests] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [pendingLeaves, setPendingLeaves] = useState([]);
 
     // Get greeting based on time
     const getGreeting = () => {
@@ -25,35 +26,41 @@ export default function Dashboard() {
         if (hour < 18) return 'Good Afternoon';
         return 'Good Evening';
     };
-
-    useEffect(() => {
-        const fetchLeaveRequests = async () => {
-            try {
-                const data = await listLeaves();
-                // Handle both array and paginated response formats
-                const leaveData = Array.isArray(data) ? data : data.results || [];
-
-                // Format leave types for display
-                const formattedLeaveData = leaveData.map(leave => ({
-                    ...leave,
-                    leave_type: formatLeaveType(leave.leave_type || leave.type)
-                }));
-                setLeaveRequests(formattedLeaveData);
-            } catch (error) {
-                console.error('Error fetching leave requests:', error);
-                showError('Failed to load leave requests. Please try again.');
-            }
-        };
-
-        fetchLeaveRequests();
-    }, [showError]);
-
     const handleApplyLeaveClick = () => {
         setIsModalOpen(true);
     };
 
     const greetingText = `${getGreeting()}, ${getUserDisplayName(user)}!`;
     const subtitleText = 'Track your leave status and apply for new leaves';
+
+    // Fetch pending leaves for admin dashboard
+    useEffect(() => {
+        const fetchPendingLeaves = async () => {
+            try {
+                const res = await getPendingLeaves();
+                const data = res.data;
+                const pendingData = Array.isArray(data) ? data : data.results || [];
+                setPendingLeaves(pendingData);
+            } catch (error) {
+                console.error('Error fetching pending leaves:', error);
+                showError('Failed to load pending leave requests. Please try again.');
+            }
+        };
+
+        fetchPendingLeaves();
+    }, [showError]);
+
+    useEffect(() => {
+        const fetchApprovedLeaves = async () => {
+            const data = await getMyLeaves();
+            const approvedleaves = data.data;
+            console.log('Approved Leaves Response:', approvedleaves);
+            const approvedData = Array.isArray(approvedleaves.data) ? approvedleaves.data : approvedleaves.data.results || [];
+            setLeaveRequests(approvedData.filter(leave => leave.status?.toLowerCase() === 'approved'));
+        };
+        fetchApprovedLeaves();
+    }, [showError]);
+
 
     return (
         <ProtectedLayout
@@ -80,10 +87,15 @@ export default function Dashboard() {
             </div>
 
             {/* Leave Stats Grid */}
-            <div className="mb-6 sm:mb-8">
-                <h2 className="text-lg sm:text-2xl font-bold text-slate-900 mb-3 sm:mb-4">Your Current Leaves</h2>
-                <LeaveStats />
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {leaveRequests
+                    .filter(req => req.status?.toLowerCase() === 'approved')
+                    .slice(0, 3) // Only show the next 3 upcoming leaves
+                    .map(leave => (
+                <ApprovedLeaveCard key={leave.id} leave={leave} />
+                ))
+  }
+</div>
 
             {/* Leave Requests Table */}
             <div className="bg-white rounded-lg sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -103,8 +115,8 @@ export default function Dashboard() {
                             </tr>
                         </thead>
                         <tbody>
-                            {leaveRequests && leaveRequests.length > 0 ? (
-                                leaveRequests.slice(0, 5).map((request) => {
+                            {pendingLeaves && pendingLeaves.length > 0 ? (
+                                pendingLeaves.slice(0, 5).map((request) => {
                                     // Add safety check for request object
                                     if (!request || !request.id) return null;
                                     return (
@@ -145,7 +157,7 @@ export default function Dashboard() {
             <ApplyLeaveModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                onSubmit={() => {
+                onSubmitSuccess={() => {
                     setIsModalOpen(false);
                     showSuccess('Leave request submitted successfully!');
                     // Refresh leave requests

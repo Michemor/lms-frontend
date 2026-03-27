@@ -1,10 +1,12 @@
-import { useParams, useState } from 'react-router-dom';
+import { useParams} from 'react-router-dom';
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { employeeSetPassword, setPasswordForLoggedInUser } from '../services/ApiClient';
 import { useAlert } from '../hooks/alerthook';
 import { useAuth } from '../hooks/authhook';
+import { getCorrectDashboardPath } from '../utils/authorize';
 
-export const SetPasswordPage = () => {
+export default function SetPasswordPage() {
     const { uid, token } = useParams();
     const navigate = useNavigate();
     const { user, refreshUser } = useAuth(); 
@@ -38,16 +40,25 @@ export const SetPasswordPage = () => {
                 showSuccess('Password set successfully! Redirecting to login...');
                 setTimeout(() => navigate('/login'), 2000);
             } else if (isFromPostLogin) {
-                await setPasswordForLoggedInUser(password, confirmPassword); // PUT /user/set-password/
+                await setPasswordForLoggedInUser(password, confirmPassword); 
                 showSuccess('Password set successfully! Redirecting to dashboard...');
-                // Optional: refresh user context to remove must_reset_password
-                refreshUser && refreshUser();
-                setTimeout(() => navigate('/dashboard'), 2000);
+                if (refreshUser) {
+                    await refreshUser(); 
+                }
+                setTimeout(() => 
+                    navigate(getCorrectDashboardPath(user)), 2000);
             } else {
                 showError('Invalid route. Cannot reset password.');
             }
         } catch (err) {
-            showError(err.response?.data?.detail || err.message || 'Failed to set password.');
+            const errData = err.response?.data;
+            const specificError = 
+                errData?.new_password?.[0] ||
+                errData?.non_field_errors?.[0] ||
+                errData?.detail ||
+                errData.message ||
+                'Failed to set password. Please try again.';
+            showError(specificError);
         } finally {
             setIsLoading(false);
         }
