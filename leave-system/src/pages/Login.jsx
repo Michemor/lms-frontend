@@ -47,8 +47,11 @@ export default function Login() {
 
         setIsLoading(false);
         // Redirect to the correct dashboard based on user role
-        navigate(getCorrectDashboardPath(userData));
-
+        if (userData.must_reset_password) {
+          navigate('/set-password');
+        } else {
+          navigate(getCorrectDashboardPath(userData));
+        }
       })
       .catch((error) => {
         const message = error?.message || 'An unexpected error occurred during login. Please try again later.';

@@ -120,18 +120,40 @@ export const getCurrentUser = async () => {
  * Set/Reset Password after clicking reset link
  * POST /auth/set-password/
  */
+export const passwordResetRequest = async (email) => {
+  try {
+    // This endpoint path needs verification with backend
+    const response = await apiClient.post('/auth/password-reset/', { email });
+    return response;
+  } catch (error) {
+    throw new Error('Failed to send password reset email', { cause: error.message });
+  }
+};
+
+  
+/**
+ * Set Password for both post-login reset and email link reset
+ * POST /auth/set-password/
+ * @param {*} uid 
+ * @param {*} token 
+ * @param {*} newPassword 
+ * @param {*} confirmPassword 
+ * @returns 
+ */
 export const setPassword = async (uid, token, newPassword, confirmPassword) => {
   try {
-    const response = await apiClient.post('/auth/set-password/', { 
-      uid: uid, 
-      token: token, 
-      new_password: newPassword, 
-      confirm_password: confirmPassword  });
+    const response = await apiClient.post('/auth/set-password/', {
+      uid: uid,
+      token: token,
+      new_password: newPassword,
+      confirm_password: confirmPassword
+    });
     return response;
   } catch (error) {
     throw new Error('Failed to set password', { cause: error.message });
   }
 };
+
 
 
 /**
@@ -515,12 +537,12 @@ export const toggleEmployeeActive = async (employeeId) => {
 
 /**
  * Resend Welcome Email (HR/Admin Only)
- * POST /employees/<id>/resend_welcome_email/
+ * POST /employees/resend_welcome_email/
  * Sends password reset link to employee
  */
 export const resendWelcomeEmail = async (employeeId) => {
   try {
-    const response = await apiClient.post(`/employees/${employeeId}/resend_welcome_email/`);
+    const response = await apiClient.post('/employees/resend_welcome_email/', { employeeId });
     return response;
   } catch (error) {
     throw new Error('Failed to resend welcome email', { cause: error.message });
@@ -651,23 +673,6 @@ export const toggleInstitutionActive = async (institutionId) => {
   }
 };
 
-
-/**
- * Password reset request - Note: This endpoint may not exist in the backend API.
- * Kept for backward compatibility. Discuss with backend team about the password reset flow.
- */
-export const passwordResetRequest = async (email) => {
-  try {
-    // This endpoint path needs verification with backend
-    const response = await apiClient.post('/auth/password-reset/', { email });
-    return response;
-  } catch (error) {
-    throw new Error('Failed to send password reset email', { cause: error.message });
-  }
-};
-
-
-
 /**
  * Get statistics - Note: This endpoint may not exist in the backend API.
  * Kept for backward compatibility. Discuss with backend team about available stats endpoints.
@@ -679,15 +684,5 @@ export const getStatistics = async () => {
     return response;
   } catch (error) {
     throw new Error('Failed to fetch statistics', { cause: error.message });
-  }
-};
-
-
-export const resetPassword = async (email) => {
-  try {    
-    const response = await apiClient.post('/auth/password-reset/', { email });
-    return response;
-  } catch (error) {
-    throw new Error('Failed to send password reset email', { cause: error.message });
   }
 };
