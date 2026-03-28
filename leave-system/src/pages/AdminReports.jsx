@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getReports, getEmployees, listLeaves, getDepartmentReports } from '../services/ApiClient';
 import ProtectedLayout from '../components/ProtectedLayout';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jsPDF-autotable';
+import autoTable from 'jspdf-autotable';
 
 
 export default function AdminReports() {
