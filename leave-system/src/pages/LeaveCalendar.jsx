@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/authhook';
 import { useAlert } from '../hooks/alerthook';
-import { getMyLeaves } from '../services/ApiClient';
-import { getUserDisplayName, getUserEmail } from '../utils/userUtils';
+import { getMyLeaves, listLeaves } from '../services/ApiClient';
 import ProtectedLayout from '../components/ProtectedLayout';
+import { getUserDisplayName } from '../utils/userUtils';
 
 export default function LeaveCalendar() {
   const location = useLocation();
@@ -14,26 +14,48 @@ export default function LeaveCalendar() {
   const [leaveEvents, setLeaveEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-// LeaveCalendar.jsx
   useEffect(() => {
     const fetchLeaveEvents = async () => {
       try {
         setIsLoading(true);
-        const res = await getMyLeaves();
-        const rawData = res.data; // Unpack the Axios payload
+        const res = user.is_admin ? await listLeaves() : await getMyLeaves();
+        const rawData = res.data;
 
         if (rawData) {
-          // Handle both array and paginated response formats
-          const leaveData = Array.isArray(rawData) ? rawData : rawData.results || [];
+          let leaveData = Array.isArray(rawData) ? rawData : rawData.results || [];
           
-          // Map events including the hydrated leave_type_name
-          const events = leaveData.map(leave => ({
-            date: leave.start_date,
-            endDate: leave.end_date,
-            type: leave.leave_type_name || leave.leave_type || leave.type || 'Leave',
-            title: leave.reason || '',
-            status: leave.status || 'pending',
-          }));
+          // For non-admins, filter out rejected leaves
+          if (!user.is_admin) {
+            leaveData = leaveData.filter(leave => String(leave.status).toLowerCase() !== 'rejected');
+          }
+          
+          const events = leaveData.map(leave => {
+            // Try multiple possible field names for employee identification
+            let employeeName = leave.employee_name || 
+                              leave.employee?.first_name || 
+                              leave.employee?.full_name ||
+                              leave.employee?.name ||
+                              leave.first_name ||
+                              leave.full_name ||
+                              leave.name ||
+                              'Unknown Employee';
+            
+            // If we have first_name and last_name, combine them
+            if (leave.employee?.first_name && leave.employee?.last_name) {
+              employeeName = `${leave.employee.first_name} ${leave.employee.last_name}`;
+            } else if (leave.first_name && leave.last_name) {
+              employeeName = `${leave.first_name} ${leave.last_name}`;
+            }
+
+            return {
+              date: leave.start_date,
+              endDate: leave.end_date,
+              type: leave.leave_type_name || leave.leave_type || leave.type || 'Leave',
+              title: user.is_admin ? `${employeeName}: ${leave.reason || ''}` : leave.reason || '',
+              status: leave.status || 'pending',
+              employeeName: employeeName
+            };
+          });
           
           setLeaveEvents(events);
         } else {
@@ -41,13 +63,16 @@ export default function LeaveCalendar() {
         }
       } catch (error) {
         console.error('Error fetching leave events:', error);
+        showError('Failed to fetch leave events. You may not have the required permissions.');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchLeaveEvents();
-  }, [showError]); // Keep dependencies clean
+    if (user) {
+        fetchLeaveEvents();
+    }
+  }, [showError, user]);
 
   const getDaysInMonth = (date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -114,27 +139,23 @@ export default function LeaveCalendar() {
     return 'bg-slate-500';
   };
 
+  const pageTitle = user?.is_admin ? "Admin Leave Calendar" : `${getUserDisplayName(user)}'s Leave Calendar`;
+  const pageSubtitle = user?.is_admin ? "View all employee leave dates" : "View your approved and pending leave dates";
+
   return (
     <ProtectedLayout
-      title={`${getUserDisplayName()}'s Leave Calendar`}
-      subtitle="View your approved and pending leave dates"
+      title={pageTitle}
+      subtitle={pageSubtitle}
       currentPath={location.pathname}
     >
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         {isLoading ? (
           <div className="bg-white rounded-xl shadow border border-slate-200 p-8 text-center">
             <p className="text-slate-600">Loading calendar...</p>
           </div>
         ) : (
         <div className="bg-white rounded-xl shadow border border-slate-200 p-8">
-          {/* User Info */}
-          <div className="mb-6 pb-6 border-b border-slate-200">
-            <p className="text-sm text-slate-600">
-              Viewing leave calendar for: <span className="font-semibold text-slate-900">{getUserDisplayName()}</span>
-            </p>
-            <p className="text-xs text-slate-500 mt-1">{getUserEmail(user)}</p>
-          </div>
-
+          
           {/* Calendar Container */}
           <div className="rounded-lg border border-slate-200 p-6 bg-slate-50">
         {/* Calendar Header */}
@@ -164,31 +185,42 @@ export default function LeaveCalendar() {
         </div>
 
         {/* Calendar days */}
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-2">
           {days.map((day, index) => {
-            const leavesonDay = day ? getLeavesForDate(day) : [];
-            const hasLeave = leavesonDay.length > 0;
-
-            const bgColor = hasLeave ? getLeaveColor(leavesonDay[0].status) : 'bg-white border-slate-200';
+            const leavesOnDay = day ? getLeavesForDate(day) : [];
+            const hasLeave = leavesOnDay.length > 0;
             
             return (
               <div
                 key={index}
-                className={`min-h-20 p-2 rounded border text-sm ${
+                className={`min-h-28 p-2 rounded border text-sm flex flex-col ${
                   !day
                     ? 'bg-slate-50 border-transparent'
-                    : bgColor
+                    : 'bg-white border-slate-200'
                 }`}
-                title={hasLeave && leavesonDay[0] ? `${leavesonDay[0].type} (${leavesonDay[0].status || 'pending'})` : ''}
               >
                 {day && (
                   <>
-                    <div className="font-bold text-slate-900">{day}</div>
-                    {hasLeave && leavesonDay[0] && (
-                      <div className={`mt-1 text-xs ${getLeaveStatusBadgeColor(leavesonDay[0].status)} text-white px-1 py-0.5 rounded truncate`}>
-                        {leavesonDay[0].type}
+                    <div className="font-bold text-slate-900 mb-1">{day}</div>
+                    <div className="space-y-1 overflow-y-auto">
+                    {hasLeave && leavesOnDay.map((leave, idx) => (
+                      <div 
+                        key={idx} 
+                        className={`p-1 rounded text-xs ${getLeaveColor(leave.status)}`}
+                        title={user.is_admin ? `${leave.employeeName}: ${leave.type} (${leave.status})` : `${leave.type} (${leave.status})`}
+                      >
+                        {user.is_admin ? (
+                            <>
+                                <span className={`font-semibold ${getLeaveStatusBadgeColor(leave.status)} text-white px-1 rounded-full text-xs`}>
+                                  {leave.employeeName && leave.employeeName.length > 0 ? leave.employeeName.split(' ')[0] : 'Emp'}
+                                </span> - {leave.type}
+                            </>
+                        ) : (
+                            <>{leave.type}</>
+                        )}
                       </div>
-                    )}
+                    ))}
+                    </div>
                   </>
                 )}
               </div>
@@ -201,21 +233,23 @@ export default function LeaveCalendar() {
           <h3 className="font-bold text-slate-900 mb-4">Status Legend</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-4 h-4 bg-green-500 rounded"></div>
+              <div className="w-4 h-4 bg-green-100 border border-green-400 rounded"></div>
               <span className="text-sm text-slate-600">Approved</span>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-4 h-4 bg-yellow-500 rounded"></div>
+              <div className="w-4 h-4 bg-yellow-100 border border-yellow-400 rounded"></div>
               <span className="text-sm text-slate-600">Pending</span>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-4 h-4 bg-red-500 rounded"></div>
-              <span className="text-sm text-slate-600">Rejected</span>
-            </div>
+            {user && user.is_admin && (
+                <div className="flex items-center gap-3">
+                <div className="w-4 h-4 bg-red-100 border border-red-400 rounded"></div>
+                <span className="text-sm text-slate-600">Rejected</span>
+                </div>
+            )}
           </div>
 
-          <h3 className="font-bold text-slate-900 mb-3">Your Leave Events</h3>
-          <div className="space-y-2">
+          <h3 className="font-bold text-slate-900 mb-3">{user.is_admin ? "All Leave Events" : "Your Leave Events"}</h3>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
             {leaveEvents.length > 0 ? (
               leaveEvents.map((event, idx) => {
                 const safeStatus = event.status || 'pending';
@@ -224,7 +258,7 @@ export default function LeaveCalendar() {
                   <div className={`w-3 h-3 mt-1 rounded flex-shrink-0 ${getLeaveStatusBadgeColor(safeStatus)}`}></div>
                   <div className="flex-1">
                     <div className="font-medium text-slate-900">
-                      {event.type} - {safeStatus.charAt(0).toUpperCase() + safeStatus.slice(1)}
+                      {user.is_admin ? `${event.employeeName} - ` : ''}{event.type} ({safeStatus.charAt(0).toUpperCase() + safeStatus.slice(1)})
                     </div>
                     <div className="text-xs text-slate-600">
                       {formatDateRange(event.date, event.endDate)}
@@ -235,7 +269,7 @@ export default function LeaveCalendar() {
               );
               })
             ) : (
-              <p className="text-slate-600 text-sm">No leave events scheduled</p>
+              <p className="text-slate-600 text-sm">{user.is_admin ? "No leave events scheduled for any employee." : "You have no upcoming approved or pending leaves."}</p>
             )}
           </div>
 

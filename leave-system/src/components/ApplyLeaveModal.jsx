@@ -465,7 +465,7 @@ export default function ApplyLeaveModal({ isOpen, onClose, onSubmitSuccess }) {
 
               <button
                 type="submit"
-                disabled={exceedsLimit || isLoadingtypes || isSubmitting}
+                disabled={isLoadingtypes || isSubmitting}
                 className="w-full bg-slate-900 hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg sm:rounded-xl transition-all shadow-lg text-sm sm:text-base min-h-[44px] flex items-center justify-center"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Request'}

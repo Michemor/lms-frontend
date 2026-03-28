@@ -33,9 +33,9 @@ export default function Login() {
         const userData = response.data.employee;
 
         if (userData.must_reset_password) {
-          showInfo('Successful Login, redirectng to set a new password')
+          showInfo('Successful Login, redirecting to set a new password')
         } else {
-          showSuccess('Login Successful! Redirecting to dashboard....')
+          showSuccess('Login Successful! Redirecting to dashboard...')
         }
       // Store token in localStorage
         if (token) {
