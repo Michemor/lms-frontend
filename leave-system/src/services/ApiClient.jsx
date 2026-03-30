@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://tci-universityleavesystem.vercel.app/api/';
+const API_BASE_URL = 'https://lms-backend-658v.onrender.com/api/';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

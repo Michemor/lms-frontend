@@ -24,6 +24,8 @@ export default function AdminReports() {
   const [individualLeaves, setIndividualLeaves] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
+  const [individualEmployeeSummary, setIndividualEmployeeSummary] = useState(null);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
 
   const [isExporting, setIsExporting] = useState(false);
 
@@ -141,6 +143,7 @@ export default function AdminReports() {
     setEmployeeSearch('');
     setSearchResults([]);
     setIndividualLeaves([]); // Reset leaves
+    setIndividualEmployeeSummary(null); // Reset summary
     setCurrentPage(1); // Reset pagination
     fetchIndividualLeaves(emp.id, 1);
     // Fetch leave summary for selected employee
@@ -150,12 +153,20 @@ export default function AdminReports() {
   // Fetch Employee Leave Summary
   const fetchEmployeeLeaveSummary = async (employeeId) => {
     try {
+      setIsSummaryLoading(true);
       console.log(`Fetching leave summary for employee ${employeeId}`);
       // Fetch all leaves to calculate summary by leave type
       const res = await getEmployeeLeaveSummary(employeeId);
       console.log('Employee leave summary response:', res);
+      const summary = res.data;
+      
+      setIndividualEmployeeSummary(summary);
+      console.log('Calculated employee leave summary:', summary);
     } catch (error) {
       console.error('Failed to load employee leave summary', error);
+      setIndividualEmployeeSummary([]);
+    } finally {
+      setIsSummaryLoading(false);
     }
   };
 const downloadPDFReport = () => {
@@ -298,7 +309,7 @@ const downloadPDFReport = () => {
                   onClick={() => downloadPDFReport()} 
                   className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-lg transition-colors shadow-sm flex items-center gap-2"
                 >
-                 {isExporting ? (
+                  {isExporting ? (
                     <>
                       <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -336,63 +347,99 @@ const downloadPDFReport = () => {
               )}
 
               {reportType === 'individual' && (
-                <>
-                  {selectedEmployee ? (
+                selectedEmployee ? (
+                  <div className="space-y-6">
+                    {/* Employee Header */}
                     <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
                       <div className="bg-slate-900 p-8 text-white flex justify-between">
-                        <div>
-                          <h2 className="text-3xl font-black mb-1">{selectedEmployee.first_name} {selectedEmployee.last_name}</h2>
-                          <p className="text-slate-400 text-sm">{selectedEmployee.email}</p>
-                        </div>
+                          <div>
+                            <h2 className="text-3xl font-black mb-1">{selectedEmployee.first_name} {selectedEmployee.last_name}</h2>
+                            <p className="text-slate-400 text-sm">{selectedEmployee.email}</p>
+                          </div>
                       </div>
-                      <div className="p-8 bg-slate-50">
-                        <h3 className="text-lg font-bold text-slate-900 mb-4">Paginated Leave History</h3>
-                        <div className="space-y-3">
-                          {individualLeaves.map((l, idx) => (
-                            <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center shadow-sm">
-                              <div>
-                                <p className="font-bold text-slate-800">{l.leave_type_name || l.leave_type || 'Leave'}</p>
-                                <p className="text-xs text-slate-500">{l.start_date} to {l.end_date}</p>
-                              </div>
-                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${l.status?.toLowerCase() === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                {l.status}
-                              </span>
-                            </div>
-                          ))}
+                    </div>
+
+                    {/* Leave Summary Section */}
+                    <div className="bg-white rounded-3xl shadow-xl border border-slate-200 p-8">
+                      <h3 className="text-lg font-bold text-slate-900 mb-4">Leave Balance Summary</h3>
+                      {isSummaryLoading ? (
+                        <div className="bg-slate-50 rounded-lg p-8 text-center border border-dashed border-slate-300">
+                          <p className="text-slate-500">Loading leave summary...</p>
                         </div>
+                      ) : individualEmployeeSummary ? (
+                        <LeaveSummaryCard summary={individualEmployeeSummary} />
+                      ) : (
+                        <div className="bg-slate-50 rounded-lg p-8 text-center border border-dashed border-slate-300">
+                          <p className="text-slate-500">No leave summary available</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Leave History Section */}
+                    <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+                      <div className="p-8 bg-slate-50 border-b border-slate-200">
+                        <h3 className="text-lg font-bold text-slate-900">Paginated Leave History</h3>
+                      </div>
+
+                      <div className="p-8">
+                        <div className="space-y-3">
+                          {individualLeaves && individualLeaves.length > 0 ? (
+                            individualLeaves.map((l, idx) => (
+                              <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center shadow-sm hover:shadow-md transition-shadow">
+                                <div>
+                                  <p className="font-bold text-slate-800">{l.leave_type_name || 'Leave'}</p>
+                                  <p className="text-xs text-slate-500">{l.start_date} to {l.end_date}</p>
+                                </div>
+                                {l.extra_unpaid_days > 0 && (
+                                  <span className="text-xs font-bold text-red-600">{l.extra_unpaid_days} Unpaid Day{l.extra_unpaid_days !== 1 ? 's' : ''}</span>
+                                )}
+                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${l.status?.toLowerCase() === 'approved' ? 'bg-green-100 text-green-700' : l.status?.toLowerCase() === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                  {l.status}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="bg-slate-50 rounded-lg p-6 text-center border border-dashed border-slate-300">
+                              <p className="text-slate-500 text-sm">No leave records found for this employee</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Pagination Controls */}
                         <div className="flex gap-2 mt-6 justify-center">
                           <button 
-                            disabled={currentPage === 1}
-                            onClick={() => fetchIndividualLeaves(selectedEmployee.id, currentPage - 1)}
-                            className="px-4 py-2 bg-white border border-slate-300 rounded text-sm font-bold disabled:opacity-50 hover:bg-slate-50"
+                              disabled={currentPage === 1}
+                              onClick={() => fetchIndividualLeaves(selectedEmployee.employee, currentPage - 1)}
+                              className="px-4 py-2 bg-white border border-slate-300 rounded text-sm font-bold disabled:opacity-50 hover:bg-slate-50"
                           >
                             Previous
                           </button>
                           <span className="px-4 py-2 text-sm font-bold text-slate-500">Page {currentPage}</span>
                           <button 
-                            disabled={!hasNext}
-                            onClick={() => fetchIndividualLeaves(selectedEmployee.id, currentPage + 1)}
-                            className="px-4 py-2 bg-white border border-slate-300 rounded text-sm font-bold disabled:opacity-50 hover:bg-slate-50"
+                              disabled={!hasNext}
+                              onClick={() => fetchIndividualLeaves(selectedEmployee.employee, currentPage + 1)}
+                              className="px-4 py-2 bg-white border border-slate-300 rounded text-sm font-bold disabled:opacity-50 hover:bg-slate-50"
                           >
                             Next
                           </button>
                         </div>
                       </div>
                     </div>
-                  ) : (
-                    <div className="bg-white rounded-3xl p-20 text-center border-2 border-dashed border-slate-200">
-                      <p className="text-slate-400 text-xl font-medium">Search and select an employee above.</p>
-                    </div>
-                  )}
-                </>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-3xl p-20 text-center border-2 border-dashed border-slate-200">
+                    <p className="text-slate-400 text-xl font-medium">Search and select an employee above.</p>
+                  </div>
+                )
               )}
+
             </div>
           )}
         </div>
       </div>
     </ProtectedLayout>
-    );
-  }
+  );
+}
 
 function StatCard({ label, value, color = "text-slate-900" }) {
   return (
