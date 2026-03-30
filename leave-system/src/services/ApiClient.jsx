@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://lms-backend-658v.onrender.com/api/';
+const API_BASE_URL = 'https://tci-universityleavesystem.vercel.app/api/';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -318,24 +318,16 @@ export const cancelOwnLeave = async (leaveId) => {
   }
 };
 
-/**
- * Update Leave Status (HR/Admin Only)
- * PATCH /leaves/<id>/update_status/
- * Request body: { status, admin_remarks (optional) }
- */
-export const updateLeaveStatus = async (leaveId, status, adminRemarks = '') => {
+
+
+export const updateLeaveStatus = async (leaveId, payload) => {
   try {
-    const payload = {
-      status,
-      admin_remarks: adminRemarks,
-    };
     const response = await apiClient.post(`/leaves/${leaveId}/update_status/`, payload);
     return response;
   } catch (error) {
     throw new Error('Failed to update leave status', { cause: error.message });
   }
-};
-
+}
 
 
 /**

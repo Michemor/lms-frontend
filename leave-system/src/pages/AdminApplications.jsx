@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAlert } from '../hooks/alerthook';
-import { getPendingLeaves, updateEmployee, getLeaveType, updateLeaveStatus } from '../services/ApiClient';
+import { getPendingLeaves, getLeaveType, updateLeaveStatus } from '../services/ApiClient';
 import ProtectedLayout from '../components/ProtectedLayout';
 
 export default function AdminApplications() {
@@ -138,8 +138,7 @@ export default function AdminApplications() {
         start_date: reviewModal.startDate,
         end_date: reviewModal.endDate
       };
-
-      // Assuming updateLeave uses PUT or PATCH. 
+      
       await updateLeaveStatus(reviewModal.app.id, payload);
       
       showSuccess(`Leave ${reviewModal.actionType.toLowerCase()} successfully!`);
@@ -150,16 +149,6 @@ export default function AdminApplications() {
     } catch (error) {
       console.error('Error updating leave:', error);
       showError('Failed to process application. Please try again.');
-    }
-  };
-
-  const fetchLeaveTypeDetails = async (leaveTypeCode) => {
-    try {
-      const res = await getLeaveType(leaveTypeCode);
-      return res.data;
-    } catch (error) {
-      console.error('Error fetching leave type details:', error);
-      return null;
     }
   };
 
@@ -295,17 +284,17 @@ export default function AdminApplications() {
                 </div>
 
                 {(() => {
-                  const originalDays = calculateDaysDifference(reviewModal.app.start, reviewModal.app.end);
                   const newDays = calculateDaysDifference(reviewModal.startDate, reviewModal.endDate);
-                  const addedDays = newDays - originalDays;
+                  const maxDaysAllowed = parseInt(reviewModal.app.maxDays) || 0;
+                  const unpaidDays = Math.max(0, newDays - maxDaysAllowed);
                   
-                  return addedDays > 0 ? (
+                  return unpaidDays > 0 ? (
                     <div className="mb-4 p-3 bg-orange-50 border-l-4 border-orange-500 rounded">
                       <p className="text-sm font-bold text-orange-700">
-                        Adding unpaid days: {addedDays}
+                        Adding unpaid days: {unpaidDays}
                       </p>
                       <p className="text-xs text-orange-600 mt-1">
-                        Original: {originalDays} days → Modified: {newDays} days
+                        Requested: {newDays} days → Max allowed: {maxDaysAllowed} days
                       </p>
                     </div>
                   ) : null;
