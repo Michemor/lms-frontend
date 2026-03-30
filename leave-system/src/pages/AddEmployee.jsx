@@ -104,10 +104,8 @@ export default function AddEmployee() {
     setIsLoading(true);
 
     createEmployee(employeeData)
-      .then((response) => {
-          if (response.status === 200 || response.status === 201) {
+      .then(() => {
             showSuccess( `Employee created successfully!`);
-          
           // Reset form
           setFormData({
             firstName: '',
@@ -123,9 +121,6 @@ export default function AddEmployee() {
           setTimeout(() => {
             navigate('/admin/dashboard');
           }, 1500);
-             } else {
-            showError('Failed to create employee. Please try again.');
-          }
         })
       .catch((error) => {
         showError("An error occurred while creating the employee. Please check the form and try again.");
