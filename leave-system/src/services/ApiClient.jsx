@@ -329,7 +329,7 @@ export const updateLeaveStatus = async (leaveId, status, adminRemarks = '') => {
       status,
       admin_remarks: adminRemarks,
     };
-    const response = await apiClient.patch(`/leaves/${leaveId}/update_status/`, payload);
+    const response = await apiClient.post(`/leaves/${leaveId}/update_status/`, payload);
     return response;
   } catch (error) {
     throw new Error('Failed to update leave status', { cause: error.message });
